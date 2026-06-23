@@ -295,6 +295,205 @@ pre.output.error { color: var(--err); }
 
 .ipt-empty { padding: 20px; color: var(--fg-dim); font-style: italic; }
 
+/* ── conntrack rich views ────────────────────────────────────────────── */
+
+.ct-wrap { display:flex; flex-direction:column; gap:12px; }
+.ct-empty-msg { padding:20px; color:var(--fg-dim); font-style:italic; }
+
+/* stat cards */
+.ct-cards {
+  display:flex; gap:10px; flex-wrap:wrap;
+}
+.ct-card {
+  background:var(--bg-2); border:1px solid var(--border);
+  border-radius:8px; padding:14px 18px; flex:1; min-width:110px;
+  border-top-width:3px;
+}
+.ct-card-total   { border-top-color:#58a6ff; }
+.ct-card-estab   { border-top-color:#3fb950; }
+.ct-card-tw      { border-top-color:#d29922; }
+.ct-card-udp     { border-top-color:#ff9e2c; }
+.ct-card-icmp    { border-top-color:#e3b341; }
+.ct-card-other   { border-top-color:#8b97a8; }
+.ct-card-bytes   { border-top-color:#bc8cff; }
+
+.ct-card-val { font-size:22px; font-weight:700; font-family:var(--mono); color:var(--fg); }
+.ct-card-lbl { font-size:11.5px; color:var(--fg-dim); margin-top:4px; text-transform:uppercase; letter-spacing:.04em; }
+
+/* distribution bars */
+.ct-dist { background:var(--bg-2); border:1px solid var(--border); border-radius:8px; padding:14px 16px; display:flex; flex-direction:column; gap:10px; }
+.ct-dist-row { display:flex; flex-direction:column; gap:5px; }
+.ct-dist-label { font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--fg-dim); }
+.ct-segbar { height:12px; border-radius:6px; background:#0a0d12; overflow:hidden; display:flex; }
+.ct-seg { height:100%; transition:width .3s; }
+.ct-seglegend { display:flex; flex-wrap:wrap; gap:10px; margin-top:2px; }
+.ct-segleg { display:flex; align-items:center; gap:5px; font-size:12px; color:var(--fg); }
+.ct-segleg b { color:var(--fg); }
+.ct-segleg em { color:var(--fg-dim); font-style:normal; }
+.ct-segdot { width:10px; height:10px; border-radius:3px; flex-shrink:0; }
+
+/* segment colors — protocol */
+.ct-seg-tcp,    .ct-segdot.ct-seg-tcp    { background:#1a4a8a; }
+.ct-seg-udp,    .ct-segdot.ct-seg-udp    { background:#7a4000; }
+.ct-seg-icmp,   .ct-segdot.ct-seg-icmp   { background:#5a4500; }
+.ct-seg-icmpv6, .ct-segdot.ct-seg-icmpv6 { background:#6a4000; }
+.ct-seg-other,  .ct-segdot.ct-seg-other  { background:#2a3040; }
+
+/* segment colors — tcp state */
+.ct-seg-state-est,   .ct-segdot.ct-seg-state-est   { background:#1e5c3a; }
+.ct-seg-state-tw,    .ct-segdot.ct-seg-state-tw    { background:#5a4500; }
+.ct-seg-state-syn,   .ct-segdot.ct-seg-state-syn   { background:#1a3a6a; }
+.ct-seg-state-fin,   .ct-segdot.ct-seg-state-fin   { background:#5a3800; }
+.ct-seg-state-cw,    .ct-segdot.ct-seg-state-cw    { background:#5a2800; }
+.ct-seg-state-close, .ct-segdot.ct-seg-state-close { background:#5c2020; }
+.ct-seg-state-none,  .ct-segdot.ct-seg-state-none  { background:#2a3040; }
+
+/* top tables */
+.ct-tops { display:flex; gap:10px; flex-wrap:wrap; }
+.ct-top-box {
+  flex:1; min-width:200px; background:var(--bg-2); border:1px solid var(--border);
+  border-radius:8px; overflow:hidden;
+}
+.ct-top-title { padding:8px 14px; font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--fg-dim); background:var(--bg-3); border-bottom:1px solid var(--border); }
+.ct-mini-table { width:100%; border-collapse:collapse; font-size:13px; }
+.ct-mini-table tr:nth-child(even) td { background:#0e1319; }
+.ct-mini-table td { padding:5px 14px; }
+.ct-mini-table code { font-family:var(--mono); color:var(--accent-2); font-size:12px; }
+.ct-top-n { text-align:right; font-family:var(--mono); font-weight:600; color:var(--fg); width:60px; }
+.ct-empty { color:var(--fg-dim); font-style:italic; }
+
+/* filter controls */
+.ct-filter { display:flex; align-items:center; flex-wrap:wrap; gap:8px; }
+.ct-search {
+  flex:1; min-width:180px; background:#0a0d12; border:1px solid var(--border);
+  color:var(--fg); padding:6px 10px; border-radius:6px;
+  font-size:13px; font-family:var(--mono);
+}
+.ct-search:focus { outline:none; border-color:var(--accent); }
+.ct-filter-group { display:flex; gap:4px; flex-wrap:wrap; }
+.ct-filter-btn {
+  background:var(--bg-3); color:var(--fg-dim); border:1px solid var(--border);
+  padding:4px 10px; border-radius:5px; cursor:pointer; font-size:12px; font-weight:500;
+}
+.ct-filter-btn:hover    { color:var(--fg); border-color:var(--accent); }
+.ct-filter-btn.active   { background:var(--bg-3); color:#fff; border-color:var(--accent); }
+
+/* state-coloured filter buttons */
+.ct-filter-state-est.active  { border-color:#3fb950; color:#3fb950; }
+.ct-filter-state-tw.active   { border-color:#d29922; color:#d29922; }
+.ct-filter-state-syn.active  { border-color:#58a6ff; color:#58a6ff; }
+.ct-filter-state-fin.active,
+.ct-filter-state-cw.active   { border-color:#ff9e2c; color:#ff9e2c; }
+.ct-filter-state-close.active{ border-color:#f85149; color:#f85149; }
+
+/* connection table */
+.ct-table-wrap { overflow-x:auto; }
+.ct-table {
+  width:100%; border-collapse:collapse; font-size:13px;
+  background:var(--bg-2); border:1px solid var(--border); border-radius:8px;
+  overflow:hidden;
+}
+.ct-table thead tr { background:#0e1319; border-bottom:1px solid var(--border); }
+.ct-table thead th { padding:7px 12px; text-align:left; font-size:11px; color:var(--fg-dim); font-weight:500; text-transform:uppercase; letter-spacing:.04em; white-space:nowrap; }
+.ct-row { border-bottom:1px solid #1a2030; }
+.ct-row:last-child { border-bottom:none; }
+.ct-row td { padding:8px 12px; vertical-align:middle; }
+
+/* tcp state badge */
+.ct-state {
+  display:inline-block; padding:2px 8px; border-radius:5px;
+  font-family:var(--mono); font-size:11px; font-weight:700;
+  white-space:nowrap; letter-spacing:.02em;
+}
+.ct-state-est    { background:#0d2b1e; color:#3fb950; border:1px solid #1e5c3a; }
+.ct-state-tw     { background:#2a2000; color:#d29922; border:1px solid #5a4500; }
+.ct-state-syn    { background:#0d1e38; color:#58a6ff; border:1px solid #1a3a6a; }
+.ct-state-fin    { background:#2a1800; color:#ff9e2c; border:1px solid #5a3800; }
+.ct-state-cw     { background:#3a1800; color:#ff7b42; border:1px solid #6a3800; }
+.ct-state-close  { background:#2d0f0f; color:#f85149; border:1px solid #5c2020; }
+.ct-state-listen { background:#0d2028; color:#2dd4bf; border:1px solid #1a4a44; }
+.ct-state-none   { background:#1a1e26; color:#8b97a8; border:1px solid #2a3040; }
+
+/* protocol badge */
+.ct-proto {
+  display:inline-block; padding:2px 7px; border-radius:4px;
+  font-family:var(--mono); font-size:11px; font-weight:600;
+}
+.ct-proto-tcp   { background:#0d1e38; color:#58a6ff; }
+.ct-proto-udp   { background:#2a1800; color:#ff9e2c; }
+.ct-proto-icmp,
+.ct-proto-icmpv6{ background:#222000; color:#e3b341; }
+
+/* flag indicators */
+.ct-flag { font-size:12px; margin-left:4px; }
+.ct-flag-assured { color:#3fb950; }
+.ct-flag-unr     { color:#d29922; }
+
+/* connection cell */
+.ct-orig { font-family:var(--mono); font-size:12.5px; }
+.ct-orig code { color:var(--fg); background:var(--bg-3); padding:1px 4px; border-radius:3px; }
+.ct-arrow { color:var(--fg-dim); margin:0 2px; }
+.ct-svc { color:var(--accent-2); font-size:11px; margin-left:4px; }
+.ct-nat {
+  display:inline-block; margin-left:6px; font-size:11px; padding:1px 6px;
+  background:#200d38; color:#bc8cff; border:1px solid #4a2070; border-radius:4px;
+}
+
+.ct-ttl-cell { font-family:var(--mono); font-size:12px; color:var(--fg-dim); white-space:nowrap; }
+.ct-bytes { font-family:var(--mono); font-size:12px; color:var(--fg-dim); white-space:nowrap; }
+.ct-dir { color:var(--fg-dim); font-size:10px; }
+
+/* footer */
+.ct-footer { display:flex; align-items:center; gap:12px; padding:8px 0; }
+.ct-footer-count { font-size:13px; color:var(--fg-dim); }
+.ct-footer-count b { color:var(--fg); }
+.ct-showmore {
+  background:var(--bg-3); color:var(--fg); border:1px solid var(--border);
+  padding:5px 12px; border-radius:6px; cursor:pointer; font-size:12px;
+}
+.ct-showmore:hover { border-color:var(--accent); }
+
+/* ── conntrack -S stats table ────────────────────────────────────── */
+.ct-stats-wrap { display:flex; flex-direction:column; gap:10px; }
+.ct-stats-note { font-size:13px; color:var(--fg-dim); padding:8px 12px; background:var(--bg-2); border:1px solid var(--border); border-radius:6px; }
+.ct-stats-table { border-collapse:collapse; font-size:13px; width:100%; }
+.ct-stats-table th { background:#0e1319; padding:7px 12px; text-align:right; font-size:11px; color:var(--fg-dim); text-transform:uppercase; border-bottom:1px solid var(--border); white-space:nowrap; }
+.ct-stats-table th:first-child { text-align:left; }
+.ct-stats-table td { padding:6px 12px; text-align:right; font-family:var(--mono); border-bottom:1px solid #1a2030; }
+.ct-stats-table td:first-child { text-align:left; }
+.ct-stats-table tr:last-child td { border-bottom:none; }
+.ct-stats-total td { background:#0e1319; font-weight:700; }
+.ct-stats-bad     { color:var(--err)  !important; font-weight:700; }
+.ct-stats-nonzero { color:var(--accent); }
+
+/* ── conntrack count gauge ───────────────────────────────────────── */
+.ct-gauge-wrap {
+  background:var(--bg-2); border:1px solid var(--border); border-radius:8px;
+  padding:20px 24px; display:flex; flex-direction:column; gap:10px; max-width:600px;
+}
+.ct-gauge-row { display:flex; align-items:baseline; gap:8px; }
+.ct-gauge-count { font-size:32px; font-weight:700; font-family:var(--mono); color:var(--fg); }
+.ct-gauge-sep   { font-size:22px; color:var(--fg-dim); }
+.ct-gauge-max   { font-size:22px; font-family:var(--mono); color:var(--fg-dim); }
+.ct-gauge-pct   { font-size:18px; font-family:var(--mono); font-weight:700; margin-left:auto; }
+.ct-gauge-ok   { color:var(--ok); }
+.ct-gauge-warn { color:#d29922; }
+.ct-gauge-crit { color:var(--err); }
+
+.ct-gauge-bar  { height:18px; background:#0a0d12; border-radius:9px; overflow:hidden; border:1px solid var(--border); }
+.ct-gauge-fill { height:100%; border-radius:9px; transition:width .5s; }
+.ct-gauge-fill.ct-gauge-ok   { background:linear-gradient(90deg,#1e5c3a,#3fb950); }
+.ct-gauge-fill.ct-gauge-warn { background:linear-gradient(90deg,#5a4500,#d29922); }
+.ct-gauge-fill.ct-gauge-crit { background:linear-gradient(90deg,#5c2020,#f85149); }
+
+.ct-gauge-labels { display:flex; justify-content:space-between; font-size:11px; color:var(--fg-dim); font-family:var(--mono); }
+.ct-gauge-msg { font-size:13.5px; padding:8px 12px; border-radius:6px; }
+.ct-gauge-msg.ct-gauge-ok   { background:#0d2b1e; border:1px solid #1e5c3a; }
+.ct-gauge-msg.ct-gauge-warn { background:#2a2000; border:1px solid #5a4500; }
+.ct-gauge-msg.ct-gauge-crit { background:#2d0f0f; border:1px solid #5c2020; }
+.ct-gauge-meta { display:flex; gap:20px; font-size:13px; color:var(--fg-dim); }
+.ct-gauge-meta b { color:var(--fg); }
+
 /* terminal */
 .term-toolbar { display: flex; gap: 8px; margin-bottom: 10px; }
 #term-input {

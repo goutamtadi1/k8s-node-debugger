@@ -211,7 +211,7 @@ function navItem(id, label, type) {
 /* ── probe panels ────────────────────────────────────────────────────────── */
 
 // Probes that get a rich custom renderer instead of a plain <pre>.
-const FANCY_PROBES = new Set(['iptables', 'iptables-nat']);
+const FANCY_PROBES = new Set(['iptables', 'iptables-nat', 'conntrack', 'conntrack-stats', 'conntrack-count']);
 
 function buildProbePanel(probe) {
   const container = document.getElementById('probe-panels');
@@ -250,7 +250,13 @@ async function runProbe(id) {
     if (cmdEl) cmdEl.innerHTML = `<span class="cmd">$ ${esc(r.command)}</span>`;
 
     if (r.ok && r.output.trim()) {
-      if (FANCY_PROBES.has(id) && typeof renderIptablesView === 'function') {
+      if (id === 'conntrack' && typeof renderConntrackView === 'function') {
+        renderConntrackView(r.output, out);
+      } else if (id === 'conntrack-stats' && typeof renderConntrackStats === 'function') {
+        renderConntrackStats(r.output, out);
+      } else if (id === 'conntrack-count' && typeof renderConntrackCount === 'function') {
+        renderConntrackCount(r.output, out);
+      } else if ((id === 'iptables' || id === 'iptables-nat') && typeof renderIptablesView === 'function') {
         renderIptablesView(r.output, out);
       } else {
         out.className = 'output';
