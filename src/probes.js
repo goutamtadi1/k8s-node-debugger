@@ -43,22 +43,38 @@ const PROBES = [
     id: 'resolv',
     label: 'resolv.conf',
     group: 'DNS',
-    desc: "The node's /etc/resolv.conf (read from the mounted host root).",
-    commands: ['cat /host/etc/resolv.conf'],
+    desc: "The node's /etc/resolv.conf (enters host mount namespace via nsenter so symlinks resolve correctly).",
+    // On many distros /etc/resolv.conf is a symlink (e.g. → /run/systemd/resolve/stub-resolv.conf).
+    // `cat /host/etc/resolv.conf` fails because the kernel resolves that symlink against the
+    // container root, not /host. nsenter --mount enters the host mount namespace, so all paths
+    // and symlinks resolve exactly as they would on the node itself.
+    commands: [
+      'nsenter --mount=/proc/1/ns/mnt -- cat /etc/resolv.conf',
+      'chroot /host cat /etc/resolv.conf',
+      'cat /host/etc/resolv.conf',
+    ],
   },
   {
     id: 'nsswitch',
     label: 'nsswitch.conf',
     group: 'DNS',
     desc: 'Host name-resolution order (/etc/nsswitch.conf).',
-    commands: ['cat /host/etc/nsswitch.conf'],
+    commands: [
+      'nsenter --mount=/proc/1/ns/mnt -- cat /etc/nsswitch.conf',
+      'chroot /host cat /etc/nsswitch.conf',
+      'cat /host/etc/nsswitch.conf',
+    ],
   },
   {
     id: 'hosts',
     label: '/etc/hosts',
     group: 'DNS',
     desc: 'Static host entries on the node.',
-    commands: ['cat /host/etc/hosts'],
+    commands: [
+      'nsenter --mount=/proc/1/ns/mnt -- cat /etc/hosts',
+      'chroot /host cat /etc/hosts',
+      'cat /host/etc/hosts',
+    ],
   },
   {
     id: 'conntrack',
