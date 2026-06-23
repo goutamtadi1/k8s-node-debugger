@@ -105,6 +105,196 @@ pre.output {
 pre.output.error { color: var(--err); }
 .empty { color: var(--fg-dim); font-style: italic; }
 
+/* ── iptables fancy view ─────────────────────────────────────────────── */
+
+.ipt-container { min-height: 40px; }
+
+.ipt-wrap { display: flex; flex-direction: column; gap: 10px; }
+
+/* top bar */
+.ipt-bar {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  background: var(--bg-2); border: 1px solid var(--border);
+  padding: 9px 14px; border-radius: 8px;
+}
+.ipt-stats { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.ipt-stat { font-size: 13px; color: var(--fg-dim); }
+.ipt-stat b { color: var(--fg); font-weight: 600; }
+.ipt-sep { color: var(--border); }
+.ipt-search {
+  flex: 1; min-width: 180px; background: #0a0d12; border: 1px solid var(--border);
+  color: var(--fg); padding: 6px 10px; border-radius: 6px;
+  font-size: 13px; font-family: var(--mono);
+}
+.ipt-search:focus { outline: none; border-color: var(--accent); }
+.ipt-bar-actions { display: flex; gap: 6px; }
+.ipt-btn {
+  background: var(--bg-3); color: var(--fg); border: 1px solid var(--border);
+  padding: 5px 10px; border-radius: 6px; cursor: pointer; font-size: 12px;
+  white-space: nowrap;
+}
+.ipt-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+/* table tabs */
+.ipt-tabs { display: flex; gap: 4px; flex-wrap: wrap; }
+.ipt-tab {
+  background: var(--bg-2); color: var(--fg-dim); border: 1px solid var(--border);
+  padding: 6px 14px; border-radius: 6px 6px 0 0; cursor: pointer;
+  font-size: 13px; font-weight: 500; border-bottom-color: transparent;
+}
+.ipt-tab:hover { background: var(--bg-3); color: var(--fg); }
+.ipt-tab.active {
+  background: var(--bg-3); color: var(--fg);
+  border-color: var(--accent) var(--accent) transparent;
+}
+.ipt-tab small { color: var(--fg-dim); font-size: 11px; margin-left: 4px; }
+
+/* body */
+.ipt-body {
+  background: var(--bg-2); border: 1px solid var(--border);
+  border-radius: 0 8px 8px 8px; overflow: hidden; display: flex; flex-direction: column; gap: 1px;
+}
+.ipt-raw-view { margin: 0; border-radius: 0 8px 8px 8px !important; }
+
+/* chain card */
+.ipt-chain { background: var(--bg); border-bottom: 1px solid var(--border); }
+.ipt-chain:last-child { border-bottom: none; }
+
+.ipt-chain-hdr {
+  display: flex; align-items: center; gap: 8px; padding: 9px 14px;
+  cursor: pointer; user-select: none;
+  background: var(--bg-2);
+  transition: background .1s;
+}
+.ipt-chain-hdr:hover { background: var(--bg-3); }
+.ipt-chain-chevron { font-size: 11px; color: var(--fg-dim); flex-shrink: 0; width: 12px; }
+.ipt-chain-name { font-family: var(--mono); font-weight: 600; font-size: 14px; color: var(--fg); }
+
+/* chain badges */
+.ipt-badge {
+  font-size: 10px; font-weight: 600; padding: 1px 6px;
+  border-radius: 10px; letter-spacing: .03em;
+}
+.ipt-badge-k8s { background: #0d3344; color: var(--accent-2); border: 1px solid #1a5566; }
+.ipt-badge-docker { background: #0a2d4a; color: #58a6ff; border: 1px solid #1a3d6a; }
+
+/* policy badge */
+.ipt-policy {
+  font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 10px;
+  letter-spacing: .04em; flex-shrink: 0;
+}
+.ipt-policy-accept { background: #0d3321; color: var(--ok); border: 1px solid #1a4a32; }
+.ipt-policy-drop   { background: #3d1515; color: var(--err); border: 1px solid #6a2525; }
+.ipt-policy-other  { background: var(--bg-3); color: var(--fg-dim); border: 1px solid var(--border); }
+
+.ipt-chain-rcount { font-size: 12px; color: var(--fg-dim); }
+.ipt-chain-counter {
+  font-size: 11px; color: var(--fg-dim); font-family: var(--mono);
+  margin-left: auto;
+}
+
+/* collapsed state */
+.ipt-chain.collapsed .ipt-chain-body { display: none; }
+
+/* no-rules placeholder */
+.ipt-no-rules {
+  padding: 10px 18px; font-size: 13px; color: var(--fg-dim); font-style: italic;
+}
+
+/* rules table */
+.ipt-rules {
+  width: 100%; border-collapse: collapse; font-size: 13px;
+}
+.ipt-rules thead tr {
+  background: #0e1319; border-bottom: 1px solid var(--border);
+}
+.ipt-rules thead th {
+  padding: 6px 12px; text-align: left; font-size: 11px;
+  color: var(--fg-dim); font-weight: 500; letter-spacing: .04em;
+  text-transform: uppercase;
+}
+.ipt-rule {
+  cursor: pointer; border-bottom: 1px solid #1a2030;
+  transition: background .08s;
+}
+.ipt-rule:last-child { border-bottom: none; }
+.ipt-rule:hover { background: #161d2a; }
+.ipt-rule td { padding: 8px 12px; vertical-align: top; }
+
+.col-num    { width: 36px; }
+.col-target { width: 120px; }
+.col-proto  { width: 64px; }
+.col-addr   { width: 130px; }
+
+.ipt-rule-num { color: var(--fg-dim); font-family: var(--mono); font-size: 12px; text-align: right; }
+
+/* target badges */
+.ipt-target {
+  display: inline-block; padding: 3px 9px; border-radius: 5px;
+  font-size: 11.5px; font-weight: 700; font-family: var(--mono);
+  letter-spacing: .02em; cursor: help; white-space: nowrap;
+}
+.ipt-target-accept   { background:#0d2b1e; color:#3fb950; border:1px solid #1e5c3a; }
+.ipt-target-drop     { background:#2d0f0f; color:#f85149; border:1px solid #5c2020; }
+.ipt-target-reject   { background:#3a1010; color:#ff7b72; border:1px solid #6a2828; }
+.ipt-target-log      { background:#2a2000; color:#d29922; border:1px solid #5a4500; }
+.ipt-target-masq     { background:#200d38; color:#bc8cff; border:1px solid #4a2070; }
+.ipt-target-nat      { background:#0d1e3a; color:#58a6ff; border:1px solid #1a3a6a; }
+.ipt-target-redirect { background:#2a1800; color:#ff9e2c; border:1px solid #5a3800; }
+.ipt-target-return   { background:#1a1e26; color:#8b97a8; border:1px solid #2a3040; }
+.ipt-target-mark     { background:#222000; color:#e3b341; border:1px solid #4a4000; }
+.ipt-target-k8s      { background:#0d2d2d; color:#2dd4bf; border:1px solid #1a5555; }
+.ipt-target-docker   { background:#0a1e38; color:#79c0ff; border:1px solid #1a3a60; }
+.ipt-target-jump     { background:#1a1e2a; color:#79c0ff; border:1px solid #2a3048; }
+
+/* rule description cell */
+.ipt-rule-summary { color: var(--fg); line-height: 1.4; }
+.ipt-rule-tags { margin-top: 4px; display: flex; flex-wrap: wrap; gap: 4px; }
+.ipt-tag {
+  font-family: var(--mono); font-size: 11px; padding: 1px 6px; border-radius: 4px;
+  background: var(--bg-3); color: var(--fg-dim); border: 1px solid var(--border);
+}
+.ipt-tag-state   { color: #58a6ff; border-color: #1a3a6a; background: #0d1e38; }
+.ipt-tag-port    { color: var(--accent-2); border-color: #1a4a44; background: #0d2828; }
+.ipt-tag-addr    { color: #e3b341; border-color: #4a4000; background: #222000; }
+.ipt-tag-iface   { color: #bc8cff; border-color: #4a2070; background: #200d38; }
+.ipt-tag-proto   { color: #ff9e2c; border-color: #5a3800; background: #2a1800; }
+.ipt-tag-comment { color: var(--fg-dim); font-style: italic; }
+
+/* raw rule (revealed on click) */
+.ipt-rule-raw {
+  display: none; margin-top: 6px; padding: 6px 10px;
+  background: #0a0d12; border-radius: 5px;
+  font-family: var(--mono); font-size: 11.5px; color: #6e7f95;
+  border: 1px solid var(--border); word-break: break-all;
+}
+.ipt-rule-raw.visible { display: block; }
+
+/* protocol chip */
+.ipt-proto {
+  display: inline-block; padding: 2px 7px; border-radius: 4px;
+  font-family: var(--mono); font-size: 11px; font-weight: 600;
+}
+.ipt-proto-tcp  { background:#0d1e38; color:#58a6ff; }
+.ipt-proto-udp  { background:#2a1800; color:#ff9e2c; }
+.ipt-proto-icmp { background:#222000; color:#e3b341; }
+.ipt-proto-all  { background:var(--bg-3); color:var(--fg-dim); }
+
+.col-addr code {
+  font-family: var(--mono); font-size: 12px;
+  background: var(--bg-3); padding: 1px 5px; border-radius: 4px;
+  color: var(--accent-2);
+}
+.dim { color: var(--fg-dim); }
+
+/* legend */
+.ipt-legend {
+  display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 0;
+}
+.ipt-legend .ipt-target { font-size: 11px; padding: 2px 8px; cursor: default; }
+
+.ipt-empty { padding: 20px; color: var(--fg-dim); font-style: italic; }
+
 /* terminal */
 .term-toolbar { display: flex; gap: 8px; margin-bottom: 10px; }
 #term-input {

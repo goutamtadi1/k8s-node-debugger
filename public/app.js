@@ -209,11 +209,16 @@ function navItem(id, label, type) {
 }
 
 /* ── probe panels ────────────────────────────────────────────────────────── */
+
+// Probes that get a rich custom renderer instead of a plain <pre>.
+const FANCY_PROBES = new Set(['iptables', 'iptables-nat']);
+
 function buildProbePanel(probe) {
   const container = document.getElementById('probe-panels');
   const section = document.createElement('section');
   section.id = 'probe-' + probe.id;
   section.className = 'panel';
+  const fancy = FANCY_PROBES.has(probe.id);
   section.innerHTML = `
     <h2>${esc(probe.label)}</h2>
     <div class="probe-head">
@@ -221,7 +226,10 @@ function buildProbePanel(probe) {
       <button id="run-btn-${esc(probe.id)}">↻ Re-run</button>
     </div>
     <div id="probe-cmd-${esc(probe.id)}" class="probe-head" style="margin-bottom:8px;"></div>
-    <pre id="probe-out-${esc(probe.id)}" class="output"><span class="empty">Not yet loaded.</span></pre>
+    ${fancy
+      ? `<div id="probe-out-${esc(probe.id)}" class="ipt-container"></div>`
+      : `<pre id="probe-out-${esc(probe.id)}" class="output"><span class="empty">Not yet loaded.</span></pre>`
+    }
   `;
   container.appendChild(section);
   section.querySelector(`#run-btn-${probe.id}`).addEventListener('click', () => runProbe(probe.id));
@@ -233,17 +241,21 @@ async function runProbe(id) {
   const cmdEl = document.getElementById('probe-cmd-' + id);
   if (!out) return;
   if (dot) dot.className = 'dot loading';
-  out.className = 'output';
-  out.innerHTML = '<span class="empty">Running…</span>';
+  out.innerHTML = '<span class="empty" style="padding:12px;display:block">Running…</span>';
   cmdEl.innerHTML = '';
 
   try {
     const r = await api('/api/probe/' + id);
     probeCache[id] = r;
     if (cmdEl) cmdEl.innerHTML = `<span class="cmd">$ ${esc(r.command)}</span>`;
+
     if (r.ok && r.output.trim()) {
-      out.className = 'output';
-      out.textContent = r.output;
+      if (FANCY_PROBES.has(id) && typeof renderIptablesView === 'function') {
+        renderIptablesView(r.output, out);
+      } else {
+        out.className = 'output';
+        out.textContent = r.output;
+      }
       if (dot) dot.className = 'dot ok';
     } else {
       const text = r.error || r.output || '(no output)';
