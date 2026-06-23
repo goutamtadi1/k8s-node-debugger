@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>k8s node debugger</title>
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/css/xterm.min.css"
+    />
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <header id="topbar">
+      <div class="brand">
+        <span class="logo">⬡</span>
+        <span>k8s node debugger</span>
+      </div>
+      <div id="session" class="session"></div>
+      <div class="actions">
+        <button id="refresh-all" title="Re-run all probes">↻ Refresh all</button>
+      </div>
+    </header>
+
+    <div id="layout">
+      <nav id="sidebar"></nav>
+      <main id="main">
+        <section id="overview" class="panel active">
+          <h2>Overview</h2>
+          <div id="node-card" class="card">Loading node info…</div>
+        </section>
+        <section id="probe-panels"></section>
+        <section id="terminal-panel" class="panel">
+          <h2>Terminal <small>— runs inside the debug pod (hostNetwork)</small></h2>
+          <div class="term-toolbar">
+            <input
+              id="term-input"
+              type="text"
+              placeholder="e.g. tcpdump -ni any port 53   ·   dig kubernetes.default   ·   conntrack -E"
+              autocomplete="off"
+              spellcheck="false"
+            />
+            <button id="term-run">Run ▶</button>
+            <button id="term-stop" title="Send SIGINT">Stop ◼</button>
+            <button id="term-clear">Clear</button>
+          </div>
+          <div id="term"></div>
+          <div class="hint">
+            Press <kbd>Enter</kbd> to run · <kbd>Ctrl-C</kbd> in the box (or Stop)
+            interrupts a running command · <kbd>↑/↓</kbd> for history.
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/lib/xterm.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@xterm/addon-fit@0.10.0/lib/addon-fit.min.js"></script>
+    <script src="/app.js"></script>
+  </body>
+</html>

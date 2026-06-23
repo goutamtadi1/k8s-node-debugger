@@ -1,0 +1,6 @@
+node_modules/
+.gomodcache/
+.gocache/
+*.log
+.env
+.DS_Store

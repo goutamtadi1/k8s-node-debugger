@@ -1,0 +1,22 @@
+{
+  "name": "k8s-node-debugger",
+  "version": "1.0.0",
+  "description": "Spin up a privileged debug pod on a target Kubernetes node and inspect its network stack (iptables, resolv.conf, conntrack, routes, sockets) from a browser UI.",
+  "bin": {
+    "k8s-node-debugger": "bin/k8s-node-debugger.js"
+  },
+  "type": "commonjs",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node bin/k8s-node-debugger.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "open": "^8.4.2",
+    "ws": "^8.18.0"
+  },
+  "license": "MIT"
+}
