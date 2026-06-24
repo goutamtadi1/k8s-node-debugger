@@ -187,14 +187,19 @@ function buildSidebar(probes) {
     hdr.textContent = grp;
     nav.appendChild(hdr);
 
-    if (grp === 'Health') {
-      // All health probes collapsed into a single "Node Health" nav item
+    const GROUP_PANELS = {
+      'Health':    { panelId: 'health',    label: 'Node Health' },
+      'Firewall':  { panelId: 'firewall',  label: 'Firewall' },
+      'Conntrack': { panelId: 'conntrack', label: 'Conntrack' },
+    };
+    if (GROUP_PANELS[grp]) {
+      const { panelId, label } = GROUP_PANELS[grp];
       const item = document.createElement('div');
       item.className = 'nav-item';
-      item.dataset.panel = 'health';
-      item.textContent = 'Node Health';
+      item.dataset.panel = panelId;
+      item.textContent = label;
       item.addEventListener('click', () => {
-        showPanel('health');
+        showPanel(panelId);
         const uncached = items.filter(p => !probeCache[p.id]);
         if (uncached.length) uncached.forEach(p => runProbe(p.id));
       });
@@ -242,7 +247,9 @@ function navItem(id, label, type) {
 /* ── probe panels ────────────────────────────────────────────────────────── */
 
 // Display order for the combined health page
-const HEALTH_ORDER = ['cpu-stat', 'mem-info', 'disk-usage', 'mem-pressure', 'oom-kills', 'kubelet-logs'];
+const HEALTH_ORDER    = ['cpu-stat', 'mem-info', 'disk-usage', 'mem-pressure', 'oom-kills', 'kubelet-logs'];
+const FIREWALL_ORDER  = ['iptables', 'iptables-nat', 'nftables', 'ipvs'];
+const CONNTRACK_ORDER = ['conntrack', 'conntrack-stats', 'conntrack-count'];
 
 // Probes that get a rich custom renderer instead of a plain <pre>.
 const FANCY_PROBES = new Set([
@@ -273,21 +280,22 @@ function buildProbePanel(probe) {
   section.querySelector(`#run-btn-${probe.id}`).addEventListener('click', () => runProbe(probe.id));
 }
 
-function buildHealthPanel(healthProbes) {
+function buildGroupPanel(groupId, title, probes, displayOrder) {
   const container = document.getElementById('probe-panels');
   const section = document.createElement('section');
-  section.id = 'probe-health';
+  section.id = 'probe-' + groupId;
   section.className = 'panel';
 
-  const ordered = HEALTH_ORDER
-    .map(id => healthProbes.find(p => p.id === id))
+  const ordered = displayOrder
+    .map(id => probes.find(p => p.id === id))
     .filter(Boolean)
-    .concat(healthProbes.filter(p => !HEALTH_ORDER.includes(p.id)));
+    .concat(probes.filter(p => !displayOrder.includes(p.id)));
 
+  const runBtnId = `run-btn-${groupId}`;
   section.innerHTML = `
     <div class="hp-header">
-      <h2>Node Health</h2>
-      <button id="run-btn-health">↻ Refresh all</button>
+      <h2>${esc(title)}</h2>
+      <button id="${runBtnId}">↻ Refresh all</button>
     </div>
     <div class="hp-tabs">
       ${ordered.map((p, i) => `
@@ -312,7 +320,6 @@ function buildHealthPanel(healthProbes) {
 
   container.appendChild(section);
 
-  // Tab switching
   section.querySelectorAll('.hp-tab').forEach(tab => {
     tab.addEventListener('click', () => {
       section.querySelectorAll('.hp-tab').forEach(t => t.classList.remove('active'));
@@ -322,7 +329,7 @@ function buildHealthPanel(healthProbes) {
     });
   });
 
-  section.querySelector('#run-btn-health').addEventListener('click', () => {
+  section.querySelector('#' + runBtnId).addEventListener('click', () => {
     for (const p of ordered) runProbe(p.id);
   });
   section.querySelectorAll('.hp-section-rerun').forEach(btn => {
@@ -511,12 +518,17 @@ async function init() {
   session = await api('/api/session');
   const nodes = await api('/api/nodes');
 
-  const healthProbes = session.probes.filter(p => p.group === 'Health');
-  const otherProbes  = session.probes.filter(p => p.group !== 'Health');
+  const GROUP_IDS = new Set(['Health', 'Firewall', 'Conntrack']);
+  const healthProbes    = session.probes.filter(p => p.group === 'Health');
+  const firewallProbes  = session.probes.filter(p => p.group === 'Firewall');
+  const conntrackProbes = session.probes.filter(p => p.group === 'Conntrack');
+  const otherProbes     = session.probes.filter(p => !GROUP_IDS.has(p.group));
 
   buildSidebar(session.probes);
   for (const p of otherProbes) buildProbePanel(p);
-  buildHealthPanel(healthProbes);
+  buildGroupPanel('health',    'Node Health', healthProbes,    HEALTH_ORDER);
+  buildGroupPanel('firewall',  'Firewall',    firewallProbes,  FIREWALL_ORDER);
+  buildGroupPanel('conntrack', 'Conntrack',   conntrackProbes, CONNTRACK_ORDER);
 
   renderOverview(nodes);
   showPanel('overview');
