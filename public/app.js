@@ -132,13 +132,19 @@ function renderOverview(nodes) {
   const card = document.getElementById('node-card');
   if (!session) return;
 
-  // session info
+  // session info — two-line topbar layout
   const sessionDiv = document.getElementById('session');
-  sessionDiv.innerHTML =
-    `<span class="pill">ctx: <b>${esc(session.context || 'default')}</b></span>` +
-    `<span class="pill">node: <b>${esc(session.node)}</b></span>` +
-    `<span class="pill">pod: <b>${esc(session.namespace)}/${esc(session.podName)}</b></span>` +
-    `<span class="pill">image: <b>${esc(session.image)}</b></span>`;
+  sessionDiv.innerHTML = `
+    <div class="session-main">
+      <span class="tb-ctx">ctx: ${esc(session.context || 'default')}</span>
+      <span class="tb-arrow">›</span>
+      <span class="tb-node" title="${esc(session.node)}">${esc(session.node)}</span>
+    </div>
+    <div class="session-sub">
+      <span class="tb-badge">pod: <b>${esc(session.namespace)}/${esc(session.podName)}</b></span>
+      <span class="tb-dot">●</span>
+      <span class="tb-badge">image: <b>${esc(session.image)}</b></span>
+    </div>`;
 
   const n = nodes.find((x) => x.name === session.node);
   if (!n) {
