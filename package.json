@@ -8,8 +8,14 @@
   "type": "commonjs",
   "main": "src/server.js",
   "scripts": {
-    "start": "node bin/k8s-node-debugger.js"
+    "start": "node bin/k8s-node-debugger.js",
+    "test": "node --check bin/k8s-node-debugger.js && node --check src/server.js && node --check src/probes.js && node --check src/k8s.js"
   },
+  "files": [
+    "bin/",
+    "src/",
+    "public/"
+  ],
   "engines": {
     "node": ">=18"
   },
