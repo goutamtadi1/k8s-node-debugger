@@ -10,13 +10,17 @@ node bin/k8s-node-debugger.js <node-name>
 
 ## Screenshots
 
-### iptables — interactive rule viewer
+### Firewall — iptables, nftables, and IPVS tabs
 
-![iptables view](docs/screenshot-iptables.png)
+![Firewall view](docs/screenshot-firewall.png)
 
-### conntrack — live connection tracking
+### Conntrack — live connection tracking
 
-![conntrack view](docs/screenshot-conntrack.png)
+![Conntrack view](docs/screenshot-conntrack-tabs.png)
+
+### Node Health — CPU, memory, disk, PSI, OOM, kubelet logs
+
+![Node Health view](docs/screenshot-health.png)
 
 ## Install
 
@@ -52,14 +56,25 @@ Press **Ctrl-C** to stop the server and delete the debug pod.
 
 | Section | Probes |
 |---|---|
-| **Firewall** | iptables (all tables), iptables nat, nftables, IPVS |
+| **Firewall** | iptables (all tables), iptables nat, nftables, IPVS — each as a tab |
 | **DNS** | resolv.conf, nsswitch.conf, /etc/hosts |
-| **Conntrack** | connection table, per-CPU stats, count/max gauge |
+| **Conntrack** | connection table, per-CPU stats, count/max gauge — each as a tab |
 | **Routing** | IPv4 routes, IPv6 routes, policy rules |
 | **Interfaces** | ip addr, ip link stats, ARP/neighbors |
 | **Sockets** | listening sockets, all TCP/UDP with process names |
 | **Kernel** | key net.* sysctls |
+| **Health** | CPU & load, memory, disk usage, PSI pressure, OOM kills, kubelet logs — each as a tab |
+| **GPU** | nvidia-smi status, GPU processes, DCGM health check |
 | **Terminal** | streaming terminal — run any command inside the pod (tcpdump, dig, ping, conntrack -E …) |
+
+### Node Health view features
+
+- **CPU & load** — load averages (1/5/15 min) vs core count, CPU model, steal %, top processes
+- **Memory** — used/available/cached/swap gauges from `/proc/meminfo`
+- **Disk usage** — `df -h` per filesystem with usage bars
+- **PSI pressure** — CPU, memory, and I/O stall metrics from `/proc/pressure/*`; colour-coded ok/warn/critical
+- **OOM kills** — parsed dmesg entries with process names and timestamps; empty means no OOM events since boot
+- **kubelet logs** — last 100 lines from journalctl, errors and warnings highlighted
 
 ### iptables view features
 
