@@ -275,20 +275,21 @@ async function runProbe(id) {
 
 /* ── fancy renderer dispatch ─────────────────────────────────────────────── */
 function tryFancyRender(id, output, container) {
-  const R = {
-    'iptables':       () => typeof renderIptablesView   === 'function' && renderIptablesView(output, container),
-    'iptables-nat':   () => typeof renderIptablesView   === 'function' && renderIptablesView(output, container),
-    'conntrack':      () => typeof renderConntrackView  === 'function' && renderConntrackView(output, container),
-    'conntrack-stats':() => typeof renderConntrackStats === 'function' && renderConntrackStats(output, container),
-    'conntrack-count':() => typeof renderConntrackCount === 'function' && renderConntrackCount(output, container),
-    'mem-info':       () => typeof renderMemInfoView    === 'function' && renderMemInfoView(output, container),
-    'mem-pressure':   () => typeof renderMemPressureView=== 'function' && renderMemPressureView(output, container),
-    'oom-kills':      () => typeof renderOomKillsView   === 'function' && renderOomKillsView(output, container),
-    'kubelet-logs':   () => typeof renderKubeletLogsView=== 'function' && renderKubeletLogsView(output, container),
-    'disk-usage':     () => typeof renderDiskView       === 'function' && renderDiskView(output, container),
-    'cpu-stat':       () => typeof renderCpuView        === 'function' && renderCpuView(output, container),
+  const renderers = {
+    'iptables':        () => renderIptablesView(output, container),
+    'iptables-nat':    () => renderIptablesView(output, container),
+    'conntrack':       () => renderConntrackView(output, container),
+    'conntrack-stats': () => renderConntrackStats(output, container),
+    'conntrack-count': () => renderConntrackCount(output, container),
+    'mem-info':        () => renderMemInfoView(output, container),
+    'mem-pressure':    () => renderMemPressureView(output, container),
+    'oom-kills':       () => renderOomKillsView(output, container),
+    'kubelet-logs':    () => renderKubeletLogsView(output, container),
+    'disk-usage':      () => renderDiskView(output, container),
+    'cpu-stat':        () => renderCpuView(output, container),
   };
-  return R[id] ? R[id]() : false;
+  if (!renderers[id]) return false;
+  try { renderers[id](); return true; } catch (e) { console.error('[fancy render]', id, e); return false; }
 }
 
 function runAllProbes() {
