@@ -19,6 +19,7 @@
       <div id="session" class="session"></div>
       <div class="actions">
         <button id="refresh-all" title="Re-run all probes">↻ Refresh all</button>
+        <button id="snapshot-btn" title="Download JSON snapshot of all loaded probe data">⬇ Snapshot</button>
       </div>
     </header>
 
@@ -30,6 +31,28 @@
           <div id="node-card" class="card">Loading node info…</div>
         </section>
         <section id="probe-panels"></section>
+
+        <!-- Connectivity prober — not a probe, interactive panel -->
+        <section id="connectivity-panel" class="panel">
+          <h2>Connectivity prober <small>— test reachability from this node</small></h2>
+          <div class="conn-form">
+            <input id="conn-target" type="text" placeholder="IP or hostname  e.g. 10.96.0.1  or  kubernetes.default" autocomplete="off" spellcheck="false" />
+            <input id="conn-port"   type="text" placeholder="Port  e.g. 443" style="width:110px" autocomplete="off" />
+            <select id="conn-proto">
+              <option value="tcp">TCP</option>
+              <option value="http">HTTP</option>
+              <option value="https">HTTPS</option>
+              <option value="udp">UDP</option>
+            </select>
+            <button id="conn-run">Test ▶</button>
+          </div>
+          <div class="conn-hint">
+            Runs ping · nc/curl · DNS resolution · traceroute from inside the debug pod (host network namespace),
+            then shows matching conntrack entries for the target.
+          </div>
+          <div id="conn-results"></div>
+        </section>
+
         <section id="terminal-panel" class="panel">
           <h2>Terminal <small>— runs inside the debug pod (hostNetwork)</small></h2>
           <div class="term-toolbar">
@@ -57,6 +80,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@xterm/addon-fit@0.10.0/lib/addon-fit.min.js"></script>
     <script src="/iptables-view.js"></script>
     <script src="/conntrack-view.js"></script>
+    <script src="/health-view.js"></script>
     <script src="/app.js"></script>
   </body>
 </html>

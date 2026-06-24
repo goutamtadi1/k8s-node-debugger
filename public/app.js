@@ -211,7 +211,11 @@ function navItem(id, label, type) {
 /* ── probe panels ────────────────────────────────────────────────────────── */
 
 // Probes that get a rich custom renderer instead of a plain <pre>.
-const FANCY_PROBES = new Set(['iptables', 'iptables-nat', 'conntrack', 'conntrack-stats', 'conntrack-count']);
+const FANCY_PROBES = new Set([
+  'iptables', 'iptables-nat',
+  'conntrack', 'conntrack-stats', 'conntrack-count',
+  'mem-info', 'mem-pressure', 'oom-kills', 'kubelet-logs', 'disk-usage', 'cpu-stat',
+]);
 
 function buildProbePanel(probe) {
   const container = document.getElementById('probe-panels');
@@ -250,15 +254,8 @@ async function runProbe(id) {
     if (cmdEl) cmdEl.innerHTML = `<span class="cmd">$ ${esc(r.command)}</span>`;
 
     if (r.ok && r.output.trim()) {
-      if (id === 'conntrack' && typeof renderConntrackView === 'function') {
-        renderConntrackView(r.output, out);
-      } else if (id === 'conntrack-stats' && typeof renderConntrackStats === 'function') {
-        renderConntrackStats(r.output, out);
-      } else if (id === 'conntrack-count' && typeof renderConntrackCount === 'function') {
-        renderConntrackCount(r.output, out);
-      } else if ((id === 'iptables' || id === 'iptables-nat') && typeof renderIptablesView === 'function') {
-        renderIptablesView(r.output, out);
-      } else {
+      const rendered = tryFancyRender(id, r.output, out);
+      if (!rendered) {
         out.className = 'output';
         out.textContent = r.output;
       }
@@ -276,6 +273,24 @@ async function runProbe(id) {
   }
 }
 
+/* ── fancy renderer dispatch ─────────────────────────────────────────────── */
+function tryFancyRender(id, output, container) {
+  const R = {
+    'iptables':       () => typeof renderIptablesView   === 'function' && renderIptablesView(output, container),
+    'iptables-nat':   () => typeof renderIptablesView   === 'function' && renderIptablesView(output, container),
+    'conntrack':      () => typeof renderConntrackView  === 'function' && renderConntrackView(output, container),
+    'conntrack-stats':() => typeof renderConntrackStats === 'function' && renderConntrackStats(output, container),
+    'conntrack-count':() => typeof renderConntrackCount === 'function' && renderConntrackCount(output, container),
+    'mem-info':       () => typeof renderMemInfoView    === 'function' && renderMemInfoView(output, container),
+    'mem-pressure':   () => typeof renderMemPressureView=== 'function' && renderMemPressureView(output, container),
+    'oom-kills':      () => typeof renderOomKillsView   === 'function' && renderOomKillsView(output, container),
+    'kubelet-logs':   () => typeof renderKubeletLogsView=== 'function' && renderKubeletLogsView(output, container),
+    'disk-usage':     () => typeof renderDiskView       === 'function' && renderDiskView(output, container),
+    'cpu-stat':       () => typeof renderCpuView        === 'function' && renderCpuView(output, container),
+  };
+  return R[id] ? R[id]() : false;
+}
+
 function runAllProbes() {
   if (!session) return;
   for (const p of session.probes) runProbe(p.id);
@@ -283,9 +298,110 @@ function runAllProbes() {
 
 document.getElementById('refresh-all').addEventListener('click', runAllProbes);
 
+/* ── connectivity prober ─────────────────────────────────────────────────── */
+function initConnectivity() {
+  const runBtn   = document.getElementById('conn-run');
+  const targetEl = document.getElementById('conn-target');
+  const portEl   = document.getElementById('conn-port');
+  const protoEl  = document.getElementById('conn-proto');
+  const resultsEl= document.getElementById('conn-results');
+  if (!runBtn) return;
+
+  async function runConnTest() {
+    const target   = targetEl.value.trim();
+    const port     = portEl.value.trim();
+    const protocol = protoEl.value;
+    if (!target) { targetEl.focus(); return; }
+
+    runBtn.disabled = true;
+    resultsEl.innerHTML = '<div class="conn-loading">Running tests…</div>';
+
+    try {
+      const data = await apiPost('/api/connectivity', { target, port, protocol });
+      renderConnResults(data, resultsEl);
+    } catch (err) {
+      resultsEl.innerHTML = `<div class="conn-error">${esc(String(err))}</div>`;
+    } finally {
+      runBtn.disabled = false;
+    }
+  }
+
+  runBtn.addEventListener('click', runConnTest);
+  targetEl.addEventListener('keydown', e => { if (e.key === 'Enter') runConnTest(); });
+}
+
+function renderConnResults(data, container) {
+  const { target, port, protocol, results } = data;
+
+  function statusBadge(ok, label) {
+    return `<span class="conn-badge ${ok ? 'conn-ok' : 'conn-fail'}">${ok ? '✔' : '✖'} ${esc(label)}</span>`;
+  }
+
+  function section(title, ok, output) {
+    if (!output && output !== '') return '';
+    return `
+      <div class="conn-section">
+        <div class="conn-sec-title">${statusBadge(ok, title)}</div>
+        ${output.trim() ? `<pre class="conn-output">${esc(output.trim())}</pre>` : ''}
+      </div>`;
+  }
+
+  container.innerHTML = `
+    <div class="conn-target-line">Testing: <code>${esc(target)}${port ? ':' + esc(port) : ''}</code> via <b>${esc(protocol.toUpperCase())}</b></div>
+    ${section('Ping (ICMP reachability)', results.ping?.ok, results.ping?.output || '')}
+    ${results.nc   ? section(`TCP connect :${port}`, results.nc.ok,   results.nc.output   || '') : ''}
+    ${results.curl ? section(`HTTP ${results.curl.url}`, results.curl.ok, results.curl.output || '') : ''}
+    ${section('DNS resolution', results.dns?.ok, results.dns?.output || '')}
+    ${section('Traceroute', results.traceroute?.ok, results.traceroute?.output || '')}
+    ${results.conntrack?.output?.trim()
+      ? `<div class="conn-section"><div class="conn-sec-title"><span class="conn-badge conn-info">⬡ Matching conntrack entries</span></div><pre class="conn-output">${esc(results.conntrack.output.trim())}</pre></div>`
+      : '<div class="conn-section conn-no-ct">No matching conntrack entries — connection may not have been attempted or was rejected before tracking.</div>'}
+  `;
+}
+
+/* ── snapshot export ─────────────────────────────────────────────────────── */
+function downloadSnapshot() {
+  const snap = {
+    exported_at: new Date().toISOString(),
+    session: {
+      node:      session?.node,
+      pod:       session?.podName,
+      namespace: session?.namespace,
+      context:   session?.context,
+      image:     session?.image,
+    },
+    probes: Object.fromEntries(
+      Object.entries(probeCache).map(([id, r]) => [id, {
+        id, label: r.label, command: r.command,
+        ok: r.ok, output: r.output, error: r.error,
+      }])
+    ),
+  };
+
+  const node = session?.node?.replace(/[^a-z0-9-]/gi, '-') || 'node';
+  const ts   = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+  const blob = new Blob([JSON.stringify(snap, null, 2)], { type: 'application/json' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = `node-debug-${node}-${ts}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 /* ── helpers ─────────────────────────────────────────────────────────────── */
 async function api(path) {
   const r = await fetch(path);
+  if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
+  return r.json();
+}
+
+async function apiPost(path, body) {
+  const r = await fetch(path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
   if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
   return r.json();
 }
@@ -308,6 +424,9 @@ async function init() {
 
   renderOverview(nodes);
   showPanel('overview');
+
+  initConnectivity();
+  document.getElementById('snapshot-btn')?.addEventListener('click', downloadSnapshot);
 
   // auto-run all probes on load
   runAllProbes();

@@ -164,6 +164,92 @@ const PROBES = [
       "sysctl net.ipv4.ip_forward net.ipv4.conf.all.rp_filter net.bridge.bridge-nf-call-iptables net.netfilter.nf_conntrack_max net.ipv4.tcp_syncookies 2>/dev/null",
     ],
   },
+
+  // ── Health ──────────────────────────────────────────────────────────
+  {
+    id: 'mem-info',
+    label: 'Memory',
+    group: 'Health',
+    desc: 'Node memory usage, buffers, cache, and swap from /proc/meminfo.',
+    commands: ['cat /proc/meminfo'],
+  },
+  {
+    id: 'mem-pressure',
+    label: 'PSI pressure',
+    group: 'Health',
+    desc: 'Linux Pressure Stall Information (PSI) for CPU, memory, and I/O — non-zero avg10 indicates resource contention.',
+    commands: [
+      'echo "=cpu="; cat /proc/pressure/cpu 2>/dev/null || echo "n/a"; echo "=memory="; cat /proc/pressure/memory 2>/dev/null || echo "n/a"; echo "=io="; cat /proc/pressure/io 2>/dev/null || echo "n/a"',
+    ],
+  },
+  {
+    id: 'oom-kills',
+    label: 'OOM kills',
+    group: 'Health',
+    desc: 'OOM kill events from the kernel ring buffer (dmesg). Empty means no OOM events since last boot.',
+    commands: [
+      'nsenter --mount=/proc/1/ns/mnt -- dmesg --time-format=iso 2>/dev/null | grep -iE "oom|out of memory|killed process|oom_kill" | tail -60',
+      'nsenter --mount=/proc/1/ns/mnt -- dmesg 2>/dev/null | grep -iE "oom|out of memory|killed process|oom_kill" | tail -60',
+      'dmesg | grep -iE "oom|out of memory|killed process|oom_kill" | tail -60',
+    ],
+  },
+  {
+    id: 'kubelet-logs',
+    label: 'kubelet logs',
+    group: 'Health',
+    desc: 'Last 100 kubelet log lines — look for eviction events, node conditions, and errors.',
+    commands: [
+      'nsenter --mount=/proc/1/ns/mnt -- journalctl -u kubelet --no-pager -n 100 --output=short-iso 2>/dev/null',
+      'nsenter --mount=/proc/1/ns/mnt -- journalctl -u kubelet --no-pager -n 100 2>/dev/null',
+    ],
+  },
+  {
+    id: 'disk-usage',
+    label: 'Disk usage',
+    group: 'Health',
+    desc: 'Filesystem disk usage on the node (df -h). High /var/lib/kubelet or /var/lib/containerd usage triggers disk-pressure eviction.',
+    commands: ['df -h', 'df -hT'],
+  },
+  {
+    id: 'cpu-stat',
+    label: 'CPU & load',
+    group: 'Health',
+    desc: 'Load averages, CPU count, and top CPU-consuming processes.',
+    commands: [
+      'echo "=loadavg="; cat /proc/loadavg; echo "=nproc="; nproc --all; echo "=cpumodel="; grep "model name" /proc/cpuinfo | head -1 | cut -d: -f2; echo "=procstat="; cat /proc/stat | head -1; echo "=topproc="; ps aux --sort=-%cpu | head -16',
+    ],
+  },
+
+  // ── GPU ─────────────────────────────────────────────────────────────
+  {
+    id: 'gpu-info',
+    label: 'GPU status',
+    group: 'GPU',
+    desc: 'NVIDIA GPU status via nvidia-smi. Only relevant on GPU-enabled nodes.',
+    commands: [
+      'nvidia-smi',
+      'nsenter --mount=/proc/1/ns/mnt -- nvidia-smi 2>/dev/null',
+    ],
+  },
+  {
+    id: 'gpu-processes',
+    label: 'GPU processes',
+    group: 'GPU',
+    desc: 'Processes currently consuming GPU memory.',
+    commands: [
+      'nvidia-smi --query-compute-apps=pid,used_gpu_memory,name --format=csv,noheader 2>/dev/null | sort -t, -k2 -rn | head -30',
+      'nvidia-smi pmon -s u -c 1 2>/dev/null',
+    ],
+  },
+  {
+    id: 'gpu-dcgm',
+    label: 'DCGM health',
+    group: 'GPU',
+    desc: 'DCGM (Data Center GPU Manager) health check. Requires dcgmi to be installed.',
+    commands: [
+      'dcgmi health -g 0 -j 2>/dev/null || dcgmi health -g 0 2>/dev/null || echo "dcgmi not available — DCGM is not installed on this node."',
+    ],
+  },
 ];
 
 module.exports = { PROBES };

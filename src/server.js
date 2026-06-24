@@ -64,6 +64,51 @@ function createServer(session) {
     });
   });
 
+  // Connectivity prober — runs nc/curl/ping from the debug pod and
+  // correlates with conntrack entries for the target IP.
+  app.post('/api/connectivity', async (req, res) => {
+    const { target, port, protocol = 'tcp' } = req.body || {};
+    if (!target) return res.status(400).json({ error: 'target required' });
+
+    const opts = { ...podOpts(), timeout: 30000 };
+    const portArg = port ? String(port) : '';
+    const results = {};
+
+    // Ping (ICMP reachability)
+    const ping = await k8s.execInPod(session.podName,
+      `ping -c 3 -W 2 ${target} 2>&1`, opts);
+    results.ping = { ok: ping.ok, output: ping.stdout + ping.stderr };
+
+    // TCP / HTTP / HTTPS
+    if (protocol === 'http' || protocol === 'https') {
+      const url = `${protocol}://${target}${portArg ? ':' + portArg : ''}`;
+      const curl = await k8s.execInPod(session.podName,
+        `curl -sv --connect-timeout 5 --max-time 10 "${url}" 2>&1 | head -80`, opts);
+      results.curl = { ok: curl.ok, output: curl.stdout + curl.stderr, url };
+    } else if (portArg) {
+      const nc = await k8s.execInPod(session.podName,
+        `nc -zv -w 5 ${target} ${portArg} 2>&1`, opts);
+      results.nc = { ok: nc.ok, output: nc.stdout + nc.stderr };
+    }
+
+    // DNS resolution
+    const dns = await k8s.execInPod(session.podName,
+      `getent hosts ${target} 2>&1 || nslookup ${target} 2>&1 | head -20`, opts);
+    results.dns = { ok: dns.ok, output: dns.stdout + dns.stderr };
+
+    // Matching conntrack entries
+    const ct = await k8s.execInPod(session.podName,
+      `conntrack -L 2>/dev/null | grep -F "${target}" | head -20`, opts);
+    results.conntrack = { ok: ct.ok, output: ct.stdout };
+
+    // Trace route (best-effort)
+    const tr = await k8s.execInPod(session.podName,
+      `traceroute -n -m 10 -w 1 ${target} 2>&1 || tracepath -n ${target} 2>&1 | head -20`, opts);
+    results.traceroute = { ok: tr.ok, output: tr.stdout + tr.stderr };
+
+    res.json({ target, port: portArg || null, protocol, results });
+  });
+
   // Arbitrary command execution from the UI.
   app.post('/api/exec', async (req, res) => {
     const command = (req.body && req.body.command || '').trim();
