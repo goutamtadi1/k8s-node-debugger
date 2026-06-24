@@ -515,6 +515,18 @@ kbd {
 
 .hv-wrap { display: flex; flex-direction: column; gap: 14px; }
 
+/* gauge header row */
+.hv-gauge-hdr { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+.hv-gauge-pct-lbl { font-family: var(--mono); font-weight: 700; font-size: 16px; }
+
+/* info / note box */
+.hv-info-note {
+  background: var(--bg-2); border: 1px solid var(--border); border-radius: 6px;
+  padding: 10px 14px; font-size: 13px; color: var(--fg-dim); line-height: 1.6;
+}
+.hv-info-note code { font-family: var(--mono); color: var(--accent-2); }
+.hv-info-note b { color: var(--fg); }
+
 /* gauge (memory, pressure) */
 .hv-gauge-wrap {
   background: var(--bg-2); border: 1px solid var(--border);
@@ -546,6 +558,11 @@ kbd {
 .hv-grid-val { font-size: 18px; font-weight: 700; font-family: var(--mono); color: var(--fg); }
 .hv-grid-sub { font-size: 11px; color: var(--fg-dim); margin-top: 2px; }
 
+/* PSI box status borders */
+.hv-psi-box-ok   { border-top: 3px solid var(--ok); }
+.hv-psi-box-warn { border-top: 3px solid #d29922; }
+.hv-psi-box-crit { border-top: 3px solid var(--err); }
+
 /* PSI boxes */
 .hv-psi-boxes { display: flex; gap: 10px; flex-wrap: wrap; }
 .hv-psi-box {
@@ -561,6 +578,13 @@ kbd {
 .hv-psi-key { color: var(--fg-dim); }
 .hv-psi-val { font-family: var(--mono); font-weight: 600; }
 .hv-psi-na { padding: 10px 12px; font-size: 13px; color: var(--fg-dim); font-style: italic; }
+
+/* OOM count badge */
+.hv-oom-count-badge {
+  font-size: 14px; font-weight: 600; color: var(--err);
+  background: #2d0f0f; border: 1px solid #5c2020; border-radius: 6px;
+  padding: 8px 14px;
+}
 
 /* OOM events */
 .hv-oom-ok {
@@ -617,6 +641,24 @@ kbd {
 .hv-disk-fill.hv-ok   { background: linear-gradient(90deg, #1e5c3a, #3fb950); }
 .hv-disk-fill.hv-warn { background: linear-gradient(90deg, #5a4500, #d29922); }
 .hv-disk-fill.hv-crit { background: linear-gradient(90deg, #5c2020, #f85149); }
+
+/* CPU info row */
+.hv-cpu-info {
+  display: flex; gap: 18px; align-items: center; flex-wrap: wrap;
+  background: var(--bg-2); border: 1px solid var(--border); border-radius: 6px;
+  padding: 10px 14px; font-size: 13px; color: var(--fg-dim);
+}
+.hv-cpu-info b { color: var(--fg); }
+.hv-steal-val { font-family: var(--mono); }
+
+/* load status note */
+.hv-load-note { font-size: 13.5px; padding: 8px 12px; border-radius: 6px; }
+.hv-note-ok   { background: #0d2b1e; border: 1px solid #1e5c3a; color: #3fb950; }
+.hv-note-warn { background: #2a2000; border: 1px solid #5a4500; color: #d29922; }
+.hv-note-crit { background: #2d0f0f; border: 1px solid #5c2020; color: var(--err); }
+
+/* process table command column */
+.hv-proc-cmd { font-family: var(--mono); color: var(--fg-dim); word-break: break-all; max-width: 320px; }
 
 /* CPU / load */
 .hv-load-cards { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
