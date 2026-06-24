@@ -511,6 +511,43 @@ kbd {
   padding: 1px 5px; font-family: var(--mono); font-size: 11px;
 }
 
+/* ── combined health page ────────────────────────────────────────────── */
+
+.hp-header {
+  display: flex; align-items: center; gap: 14px; margin-bottom: 20px;
+}
+.hp-header h2 { margin: 0; }
+.hp-header button {
+  background: var(--bg-3); color: var(--fg-dim); border: 1px solid var(--border);
+  padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 500;
+}
+.hp-header button:hover { border-color: var(--accent); color: var(--fg); }
+
+.hp-sections { display: flex; flex-direction: column; gap: 14px; }
+
+.hp-section {
+  background: var(--bg-2); border: 1px solid var(--border); border-radius: 10px; overflow: hidden;
+}
+
+.hp-section-hdr {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  padding: 10px 16px; background: var(--bg-3); border-bottom: 1px solid var(--border);
+}
+.hp-section-title { font-size: 14px; font-weight: 700; color: var(--fg); white-space: nowrap; }
+.hp-section-desc  { font-size: 12px; color: var(--fg-dim); flex: 1; min-width: 0; }
+.hp-section-cmd   { font-family: var(--mono); font-size: 11px; }
+.hp-section-cmd .cmd {
+  color: var(--accent-2); background: var(--bg); border: 1px solid var(--border);
+  padding: 2px 7px; border-radius: 4px;
+}
+.hp-section-rerun {
+  background: transparent; color: var(--fg-dim); border: 1px solid var(--border);
+  padding: 3px 8px; border-radius: 5px; cursor: pointer; font-size: 12px; flex-shrink: 0;
+}
+.hp-section-rerun:hover { border-color: var(--accent); color: var(--fg); }
+
+.hp-section-body { padding: 16px; }
+
 /* ── health view ─────────────────────────────────────────────────────── */
 
 .hv-wrap { display: flex; flex-direction: column; gap: 14px; }

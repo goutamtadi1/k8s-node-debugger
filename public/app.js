@@ -170,19 +170,44 @@ function buildSidebar(probes) {
   overviewItem.querySelector('.dot').style.display = 'none';
   nav.appendChild(overviewItem);
 
-  // group probes
   const groups = {};
   for (const p of probes) {
     (groups[p.group] = groups[p.group] || []).push(p);
   }
+
   for (const [grp, items] of Object.entries(groups)) {
     const hdr = document.createElement('div');
     hdr.className = 'nav-group';
     hdr.textContent = grp;
     nav.appendChild(hdr);
-    for (const p of items) nav.appendChild(navItem(p.id, p.label, 'probe'));
+
+    if (grp === 'Health') {
+      // All health probes collapsed into a single "Node Health" nav item
+      const item = document.createElement('div');
+      item.className = 'nav-item';
+      item.dataset.panel = 'health';
+      item.textContent = 'Node Health';
+      item.addEventListener('click', () => {
+        showPanel('health');
+        const uncached = items.filter(p => !probeCache[p.id]);
+        if (uncached.length) uncached.forEach(p => runProbe(p.id));
+      });
+      nav.appendChild(item);
+    } else {
+      for (const p of items) nav.appendChild(navItem(p.id, p.label, 'probe'));
+    }
   }
 
+  // Connectivity (not a probe group — special panel)
+  const connHdr = document.createElement('div');
+  connHdr.className = 'nav-group';
+  connHdr.textContent = 'Connectivity';
+  nav.appendChild(connHdr);
+  const connItem = navItem('connectivity', 'Connectivity prober', 'connectivity');
+  connItem.querySelector('.dot').style.display = 'none';
+  nav.appendChild(connItem);
+
+  // Terminal
   const termHdr = document.createElement('div');
   termHdr.className = 'nav-group';
   termHdr.textContent = 'Terminal';
@@ -209,6 +234,9 @@ function navItem(id, label, type) {
 }
 
 /* ── probe panels ────────────────────────────────────────────────────────── */
+
+// Display order for the combined health page
+const HEALTH_ORDER = ['cpu-stat', 'mem-info', 'disk-usage', 'mem-pressure', 'oom-kills', 'kubelet-logs'];
 
 // Probes that get a rich custom renderer instead of a plain <pre>.
 const FANCY_PROBES = new Set([
@@ -237,6 +265,50 @@ function buildProbePanel(probe) {
   `;
   container.appendChild(section);
   section.querySelector(`#run-btn-${probe.id}`).addEventListener('click', () => runProbe(probe.id));
+}
+
+function buildHealthPanel(healthProbes) {
+  const container = document.getElementById('probe-panels');
+  const section = document.createElement('section');
+  section.id = 'probe-health';
+  section.className = 'panel';
+
+  // Sort probes into the preferred display order
+  const ordered = HEALTH_ORDER
+    .map(id => healthProbes.find(p => p.id === id))
+    .filter(Boolean)
+    .concat(healthProbes.filter(p => !HEALTH_ORDER.includes(p.id)));
+
+  section.innerHTML = `
+    <div class="hp-header">
+      <h2>Node Health</h2>
+      <button id="run-btn-health">↻ Refresh all</button>
+    </div>
+    <div class="hp-sections">
+      ${ordered.map(p => `
+        <div class="hp-section" id="hsec-${esc(p.id)}">
+          <div class="hp-section-hdr">
+            <span class="hp-section-title">${esc(p.label)}</span>
+            <span class="hp-section-desc">${esc(p.desc)}</span>
+            <div id="probe-cmd-${esc(p.id)}" class="hp-section-cmd"></div>
+            <button class="hp-section-rerun" data-probe="${esc(p.id)}" title="Re-run">↻</button>
+          </div>
+          <div class="hp-section-body">
+            <div id="probe-out-${esc(p.id)}" class="ipt-container">
+              <span class="empty" style="padding:12px;display:block">Loading…</span>
+            </div>
+          </div>
+        </div>`).join('')}
+    </div>`;
+
+  container.appendChild(section);
+
+  section.querySelector('#run-btn-health').addEventListener('click', () => {
+    for (const p of ordered) runProbe(p.id);
+  });
+  section.querySelectorAll('.hp-section-rerun').forEach(btn => {
+    btn.addEventListener('click', () => runProbe(btn.dataset.probe));
+  });
 }
 
 async function runProbe(id) {
@@ -420,8 +492,12 @@ async function init() {
   session = await api('/api/session');
   const nodes = await api('/api/nodes');
 
+  const healthProbes = session.probes.filter(p => p.group === 'Health');
+  const otherProbes  = session.probes.filter(p => p.group !== 'Health');
+
   buildSidebar(session.probes);
-  for (const p of session.probes) buildProbePanel(p);
+  for (const p of otherProbes) buildProbePanel(p);
+  buildHealthPanel(healthProbes);
 
   renderOverview(nodes);
   showPanel('overview');
