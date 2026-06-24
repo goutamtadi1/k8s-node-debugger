@@ -279,7 +279,6 @@ function buildHealthPanel(healthProbes) {
   section.id = 'probe-health';
   section.className = 'panel';
 
-  // Sort probes into the preferred display order
   const ordered = HEALTH_ORDER
     .map(id => healthProbes.find(p => p.id === id))
     .filter(Boolean)
@@ -290,24 +289,38 @@ function buildHealthPanel(healthProbes) {
       <h2>Node Health</h2>
       <button id="run-btn-health">↻ Refresh all</button>
     </div>
-    <div class="hp-sections">
-      ${ordered.map(p => `
-        <div class="hp-section" id="hsec-${esc(p.id)}">
-          <div class="hp-section-hdr">
-            <span class="hp-section-title">${esc(p.label)}</span>
-            <span class="hp-section-desc">${esc(p.desc)}</span>
+    <div class="hp-tabs">
+      ${ordered.map((p, i) => `
+        <button class="hp-tab${i === 0 ? ' active' : ''}" data-probe="${esc(p.id)}">
+          <span class="hp-tab-label">${esc(p.label)}</span>
+          <span class="hp-tab-dot dot" id="dot-${esc(p.id)}"></span>
+        </button>`).join('')}
+    </div>
+    <div class="hp-panes">
+      ${ordered.map((p, i) => `
+        <div class="hp-pane${i === 0 ? ' active' : ''}" id="hpane-${esc(p.id)}">
+          <div class="hp-pane-meta">
+            <span class="hp-pane-desc">${esc(p.desc)}</span>
             <div id="probe-cmd-${esc(p.id)}" class="hp-section-cmd"></div>
-            <button class="hp-section-rerun" data-probe="${esc(p.id)}" title="Re-run">↻</button>
+            <button class="hp-section-rerun" data-probe="${esc(p.id)}" title="Re-run this probe">↻ Re-run</button>
           </div>
-          <div class="hp-section-body">
-            <div id="probe-out-${esc(p.id)}" class="ipt-container">
-              <span class="empty" style="padding:12px;display:block">Loading…</span>
-            </div>
+          <div id="probe-out-${esc(p.id)}" class="ipt-container">
+            <span class="empty" style="padding:12px;display:block">Loading…</span>
           </div>
         </div>`).join('')}
     </div>`;
 
   container.appendChild(section);
+
+  // Tab switching
+  section.querySelectorAll('.hp-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      section.querySelectorAll('.hp-tab').forEach(t => t.classList.remove('active'));
+      section.querySelectorAll('.hp-pane').forEach(p => p.classList.remove('active'));
+      tab.classList.add('active');
+      section.querySelector(`#hpane-${tab.dataset.probe}`).classList.add('active');
+    });
+  });
 
   section.querySelector('#run-btn-health').addEventListener('click', () => {
     for (const p of ordered) runProbe(p.id);

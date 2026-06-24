@@ -588,30 +588,57 @@ kbd {
 }
 .hp-header button:hover { border-color: var(--accent); color: var(--fg); }
 
-.hp-sections { display: flex; flex-direction: column; gap: 14px; }
-
-.hp-section {
-  background: var(--bg-2); border: 1px solid var(--border); border-radius: 10px; overflow: hidden;
+/* tab strip */
+.hp-tabs {
+  display: flex; flex-wrap: wrap; gap: 4px;
+  margin-bottom: 0; border-bottom: 2px solid var(--border);
+  padding-bottom: 0;
 }
+.hp-tab {
+  display: flex; align-items: center; gap: 7px;
+  background: var(--bg-2); color: var(--fg-dim);
+  border: 1px solid var(--border); border-bottom: none;
+  padding: 8px 16px; border-radius: 7px 7px 0 0;
+  cursor: pointer; font-size: 13px; font-weight: 500;
+  position: relative; bottom: -2px;
+  transition: background .12s, color .12s;
+}
+.hp-tab:hover { background: var(--bg-3); color: var(--fg); }
+.hp-tab.active {
+  background: var(--bg-3); color: #fff;
+  border-color: var(--border); border-bottom-color: var(--bg-3);
+  border-top: 2px solid var(--accent);
+}
+.hp-tab .dot { flex-shrink: 0; }
 
-.hp-section-hdr {
+/* pane area */
+.hp-panes {
+  background: var(--bg-2); border: 1px solid var(--border);
+  border-top: none; border-radius: 0 0 10px 10px;
+}
+.hp-pane { display: none; }
+.hp-pane.active { display: block; }
+
+/* meta bar inside each pane */
+.hp-pane-meta {
   display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
-  padding: 10px 16px; background: var(--bg-3); border-bottom: 1px solid var(--border);
+  padding: 10px 16px; background: var(--bg-3);
+  border-bottom: 1px solid var(--border);
 }
-.hp-section-title { font-size: 14px; font-weight: 700; color: var(--fg); white-space: nowrap; }
-.hp-section-desc  { font-size: 12px; color: var(--fg-dim); flex: 1; min-width: 0; }
-.hp-section-cmd   { font-family: var(--mono); font-size: 11px; }
+.hp-pane-desc { font-size: 12px; color: var(--fg-dim); flex: 1; min-width: 0; }
+.hp-section-cmd { font-family: var(--mono); font-size: 11px; }
 .hp-section-cmd .cmd {
   color: var(--accent-2); background: var(--bg); border: 1px solid var(--border);
   padding: 2px 7px; border-radius: 4px;
 }
 .hp-section-rerun {
   background: transparent; color: var(--fg-dim); border: 1px solid var(--border);
-  padding: 3px 8px; border-radius: 5px; cursor: pointer; font-size: 12px; flex-shrink: 0;
+  padding: 4px 10px; border-radius: 5px; cursor: pointer; font-size: 12px; flex-shrink: 0;
 }
 .hp-section-rerun:hover { border-color: var(--accent); color: var(--fg); }
 
-.hp-section-body { padding: 16px; }
+/* content inside pane */
+.hp-pane > .ipt-container { padding: 16px; }
 
 /* ── health view ─────────────────────────────────────────────────────── */
 
