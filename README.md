@@ -12,15 +12,15 @@ node bin/k8s-node-debugger.js <node-name>
 
 ### Firewall — iptables, nftables, and IPVS tabs
 
-![Firewall view](docs/screenshot-firewall.png)
+![Firewall view](https://raw.githubusercontent.com/goutamtadi1/k8s-node-debugger/main/docs/screenshot-firewall.png)
 
 ### Conntrack — live connection tracking
 
-![Conntrack view](docs/screenshot-conntrack-tabs.png)
+![Conntrack view](https://raw.githubusercontent.com/goutamtadi1/k8s-node-debugger/main/docs/screenshot-conntrack-tabs.png)
 
 ### Node Health — CPU, memory, disk, PSI, OOM, kubelet logs
 
-![Node Health view](docs/screenshot-health.png)
+![Node Health view](https://raw.githubusercontent.com/goutamtadi1/k8s-node-debugger/main/docs/screenshot-health.png)
 
 ## Install
 
