@@ -25,12 +25,25 @@ node bin/k8s-node-debugger.js <node-name>
 ## Install
 
 ```bash
-git clone git@github.com:goutamtadi1/k8s-node-debugger.git
-cd k8s-node-debugger
-npm install
+npm install -g @gtadi/k8s-node-debugger
+```
+
+Or run without installing:
+
+```bash
+npx @gtadi/k8s-node-debugger <node-name>
 ```
 
 Requires `kubectl` on your PATH with an active kubeconfig. The debug image (`nicolaka/netshoot`) is pulled from Docker Hub on first use.
+
+### From source
+
+```bash
+git clone git@github.com:goutamtadi1/k8s-node-debugger.git
+cd k8s-node-debugger
+npm install
+node bin/k8s-node-debugger.js <node-name>
+```
 
 ## Usage
 
