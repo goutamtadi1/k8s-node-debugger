@@ -256,6 +256,7 @@ const FANCY_PROBES = new Set([
   'iptables', 'iptables-nat',
   'conntrack', 'conntrack-stats', 'conntrack-count',
   'mem-info', 'mem-pressure', 'oom-kills', 'kubelet-logs', 'disk-usage', 'cpu-stat',
+  'gpu-info', 'gpu-health', 'gpu-processes',
 ]);
 
 function buildProbePanel(probe) {
@@ -385,6 +386,9 @@ function tryFancyRender(id, output, container) {
     'kubelet-logs':    () => renderKubeletLogsView(output, container),
     'disk-usage':      () => renderDiskView(output, container),
     'cpu-stat':        () => renderCpuView(output, container),
+    'gpu-info':        () => renderGpuInfoView(output, container),
+    'gpu-health':      () => renderGpuHealthView(output, container),
+    'gpu-processes':   () => renderGpuProcessesView(output, container),
   };
   if (!renderers[id]) return false;
   try { renderers[id](); return true; } catch (e) { console.error('[fancy render]', id, e); return false; }

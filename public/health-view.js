@@ -451,6 +451,415 @@
     container.appendChild(wrap);
   }
 
+  /* ══════════════════════════════════════════════════════════════════════
+   * GPU status — nvidia-smi plain text table
+   * ══════════════════════════════════════════════════════════════════════ */
+  function renderGpuInfoView(raw, container) {
+    if (!raw.includes('NVIDIA-SMI')) { container.className = 'output'; container.textContent = raw; return; }
+
+    const lines = raw.split('\n');
+
+    // Version header
+    const verLine   = lines.find(l => l.includes('NVIDIA-SMI')) || '';
+    const smiVer    = verLine.match(/NVIDIA-SMI\s+(\S+)/)?.[1]       || '—';
+    const driverVer = verLine.match(/Driver Version:\s+(\S+)/)?.[1]  || '—';
+    const cudaVer   = verLine.match(/CUDA Version:\s+(\S+)/)?.[1]    || '—';
+
+    // Collect GPU data: groups of 3 content lines between |====| ... +---+
+    const gpus = [];
+    let inGpu = false, buf = [];
+    for (const line of lines) {
+      if (/^\|[=]+\|?$/.test(line.trim())) { inGpu = true; buf = []; continue; }
+      if (inGpu && line.startsWith('+')) {
+        if (buf.length >= 2) {
+          const g = parseNvidiaSmiGpuBlock(buf);
+          if (g) gpus.push(g);
+        }
+        inGpu = false; buf = []; continue;
+      }
+      if (inGpu && line.startsWith('|') && !line.includes('Processes:') &&
+          !line.includes('No running') && !line.includes('GPU   GI') && !line.includes('GPU  GI')) {
+        buf.push(line);
+      }
+    }
+
+    // Processes
+    let noProcs = raw.includes('No running processes found');
+    const procs = [];
+    if (!noProcs) {
+      const procRe = /\|\s+(\d+)\s+\S+\s+\S+\s+(\d+)\s+(\S+)\s+(.*?)\s+(\d+)MiB\s+\|/;
+      let inP = false;
+      for (const line of lines) {
+        if (line.includes('Processes:')) { inP = true; continue; }
+        if (inP && /^\|[=]+/.test(line)) continue;
+        if (inP && line.startsWith('+')) break;
+        if (inP) {
+          if (line.includes('No running')) { noProcs = true; break; }
+          const m = line.match(procRe);
+          if (m) procs.push({ gpu: m[1], pid: m[2], type: m[3], name: m[4].trim(), mem: m[5] });
+        }
+      }
+    }
+
+    function tempCls(t)  { return t >= 85 ? 'hv-crit' : t >= 70 ? 'hv-warn' : 'hv-ok'; }
+    function pctCls(v)   { return v >= 90 ? 'hv-crit' : v >= 70 ? 'hv-warn' : 'hv-ok'; }
+    function powerCls2(d,c) { if (!c) return 'hv-ok'; const r=d/c; return r>=0.95?'hv-crit':r>=0.80?'hv-warn':'hv-ok'; }
+
+    function memBar(used, total) {
+      if (!total) return '';
+      const pct = Math.min(Math.round(used/total*100),100);
+      const cls = pctCls(pct);
+      return `<div class="gpu-health-metric">
+        <div class="gpu-health-metric-hdr">
+          <span class="gpu-health-lbl">Memory</span>
+          <span class="gpu-health-val ${cls}">${pct}%</span>
+        </div>
+        <div class="hv-gauge-bar gpu-health-bar"><div class="hv-gauge-fill ${cls}" style="width:${pct}%"></div></div>
+        <div class="gpu-health-sub">${used} MiB used · ${total} MiB total</div>
+      </div>`;
+    }
+
+    function pwrBar(draw, cap) {
+      if (!cap) return '';
+      const pct = Math.min(Math.round(draw/cap*100),100);
+      const cls = powerCls2(draw, cap);
+      return `<div class="gpu-health-metric">
+        <div class="gpu-health-metric-hdr">
+          <span class="gpu-health-lbl">Power</span>
+          <span class="gpu-health-val ${cls}">${draw} W / ${cap} W</span>
+        </div>
+        <div class="hv-gauge-bar gpu-health-bar"><div class="hv-gauge-fill ${cls}" style="width:${pct}%"></div></div>
+      </div>`;
+    }
+
+    const gpuCards = gpus.map(g => `
+      <div class="gpu-health-card">
+        <div class="gpu-health-hdr">
+          <span class="gpu-proc-idx">GPU ${h(g.index)}</span>
+          <span class="gpu-health-name">${h(g.name)}</span>
+        </div>
+        <div class="gpu-health-row">
+          <div class="gpu-health-cell">
+            <span class="gpu-health-lbl">GPU Temp</span>
+            <span class="gpu-health-val ${tempCls(g.temp)}">${g.temp}°C</span>
+          </div>
+          <div class="gpu-health-cell">
+            <span class="gpu-health-lbl">Perf</span>
+            <span class="gpu-health-val">${h(g.perf)}</span>
+          </div>
+          <div class="gpu-health-cell">
+            <span class="gpu-health-lbl">GPU Util</span>
+            <span class="gpu-health-val ${pctCls(g.utilGpu)}">${g.utilGpu}%</span>
+          </div>
+          <div class="gpu-health-cell">
+            <span class="gpu-health-lbl">Fan</span>
+            <span class="gpu-health-val">${g.fan !== null ? g.fan + '%' : '—'}</span>
+          </div>
+        </div>
+        ${memBar(g.memUsed, g.memTotal)}
+        ${pwrBar(g.pwrDraw, g.pwrCap)}
+        <div class="gpu-info-meta">
+          <div class="gpu-info-meta-row">
+            <span class="gpu-health-lbl">Bus ID</span>
+            <span class="gpu-info-meta-val">${h(g.busId)}</span>
+          </div>
+          <div class="gpu-info-meta-row">
+            <span class="gpu-health-lbl">Persistence</span>
+            <span class="gpu-info-meta-val ${g.persistence === 'On' ? 'hv-ok' : ''}">${h(g.persistence)}</span>
+          </div>
+          <div class="gpu-info-meta-row">
+            <span class="gpu-health-lbl">Compute Mode</span>
+            <span class="gpu-info-meta-val">${h(g.computeMode)}</span>
+          </div>
+          ${g.migMode ? `<div class="gpu-info-meta-row">
+            <span class="gpu-health-lbl">MIG Mode</span>
+            <span class="gpu-info-meta-val">${h(g.migMode)}</span>
+          </div>` : ''}
+        </div>
+      </div>`).join('');
+
+    const procsHtml = noProcs
+      ? '<div class="gpu-info-no-procs">No running processes.</div>'
+      : `<div class="hv-top-table-wrap"><table class="hv-top-table">
+          <thead><tr><th>GPU</th><th>PID</th><th>Type</th><th>Process</th><th>GPU Mem</th></tr></thead>
+          <tbody>${procs.map(p => `<tr>
+            <td><span class="gpu-proc-idx">GPU ${h(p.gpu)}</span></td>
+            <td class="gpu-proc-pid">${h(p.pid)}</td>
+            <td><span class="gpu-proc-type gpu-proc-type-${h(p.type.toLowerCase())}">${h(p.type)}</span></td>
+            <td class="gpu-proc-cmd">${h(p.name)}</td>
+            <td class="gpu-proc-mem">${h(p.mem)} MiB</td>
+          </tr>`).join('')}</tbody>
+        </table></div>`;
+
+    const wrap = document.createElement('div');
+    wrap.className = 'hv-wrap gpu-health-grid';
+    wrap.innerHTML = `
+      <div class="gpu-info-versions">
+        <div class="gpu-info-ver-item"><span class="gpu-health-lbl">NVIDIA-SMI</span><span class="gpu-info-ver-val">${h(smiVer)}</span></div>
+        <div class="gpu-info-ver-item"><span class="gpu-health-lbl">Driver</span><span class="gpu-info-ver-val">${h(driverVer)}</span></div>
+        <div class="gpu-info-ver-item"><span class="gpu-health-lbl">CUDA</span><span class="gpu-info-ver-val">${h(cudaVer)}</span></div>
+      </div>
+      ${gpuCards}
+      <div class="gpu-info-procs-section">
+        <div class="gpu-info-procs-title">Processes</div>
+        ${procsHtml}
+      </div>`;
+
+    container.innerHTML = '';
+    container.className = '';
+    container.appendChild(wrap);
+  }
+
+  function parseNvidiaSmiGpuBlock(lines) {
+    // Line 0: |  idx  name  persistence  | bus_id  disp_a  |  ecc  |
+    // Line 1: |  fan  tempC  perf  drawW/capW  |  usedMiB/totalMiB  |  util%  compute  |
+    // Line 2: |  ...  |  ...  |  mig  |
+    const l0 = lines[0] || '', l1 = lines[1] || '', l2 = lines[2] || '';
+    const m0 = l0.match(/\|\s+(\d+)\s+(.*?)\s+(On|Off)\s+\|\s+(\S+)\s+(On|Off)\s+\|\s+(\S+)\s+\|/);
+    const m1 = l1.match(/\|\s*(N\/A|\d+)\s+(\d+)C\s+(\S+)\s+(\d+)W\s*\/\s*(\d+)W\s+\|\s+(\d+)MiB\s*\/\s*(\d+)MiB\s+\|\s+(\d+)%\s+(\S+)\s+\|/);
+    if (!m0 || !m1) return null;
+    const m2 = l2.match(/\|\s*\|\s*\|\s+(\S+)\s+\|/);
+    return {
+      index:       m0[1],
+      name:        m0[2].trim(),
+      persistence: m0[3],
+      busId:       m0[4],
+      dispA:       m0[5],
+      ecc:         m0[6],
+      fan:         m1[1] === 'N/A' ? null : parseInt(m1[1]),
+      temp:        parseInt(m1[2]),
+      perf:        m1[3],
+      pwrDraw:     parseInt(m1[4]),
+      pwrCap:      parseInt(m1[5]),
+      memUsed:     parseInt(m1[6]),
+      memTotal:    parseInt(m1[7]),
+      utilGpu:     parseInt(m1[8]),
+      computeMode: m1[9],
+      migMode:     m2?.[1] || null,
+    };
+  }
+
+  /* ══════════════════════════════════════════════════════════════════════
+   * GPU health — nvidia-smi --query-gpu CSV
+   * Columns: index, name, temp.gpu, temp.mem, power.draw, power.limit,
+   *          util.gpu, util.mem, mem.used, mem.free, mem.total,
+   *          ecc.corrected, ecc.uncorrected, throttle_reasons
+   * ══════════════════════════════════════════════════════════════════════ */
+  function renderGpuHealthView(raw, container) {
+    const lines = raw.split('\n').map(l => l.trim()).filter(l => l);
+    if (!lines.length) { container.textContent = raw; return; }
+
+    const THROTTLE_REASONS = [
+      [0x02,  'App Clock Setting'],
+      [0x04,  'SW Power Cap'],
+      [0x08,  'HW Slowdown'],
+      [0x10,  'Sync Boost'],
+      [0x20,  'SW Thermal Slowdown'],
+      [0x40,  'HW Thermal Slowdown'],
+      [0x80,  'HW Power Brake'],
+      [0x100, 'Display Clock Setting'],
+    ];
+
+    function pn(s) { const n = parseFloat(s); return isNaN(n) ? null : n; }
+    function strip(s, u) { return pn((s || '').replace(u, '')); }
+
+    const gpus = lines.map(line => {
+      const p = line.split(',').map(s => s.trim());
+      return {
+        index:          p[0],
+        name:           p[1],
+        tempGpu:        pn(p[2]),
+        tempMem:        pn(p[3]),
+        powerDraw:      strip(p[4], ' W'),
+        powerLimit:     strip(p[5], ' W'),
+        utilGpu:        strip(p[6], ' %'),
+        utilMem:        strip(p[7], ' %'),
+        memUsed:        strip(p[8], ' MiB'),
+        memTotal:       strip(p[10], ' MiB'),
+        eccCorrected:   pn(p[11]),
+        eccUncorrected: pn(p[12]),
+        throttleRaw:    (p[13] || '').trim(),
+      };
+    });
+
+    function tempCls(t)    { return t === null ? '' : t >= 85 ? 'hv-crit' : t >= 70 ? 'hv-warn' : 'hv-ok'; }
+    function pctCls(v)     { return v === null ? '' : v >= 90 ? 'hv-crit' : v >= 70 ? 'hv-warn' : 'hv-ok'; }
+    function powerCls(d,l) { if (d === null || !l) return 'hv-ok'; const r = d/l; return r >= 0.95 ? 'hv-crit' : r >= 0.80 ? 'hv-warn' : 'hv-ok'; }
+
+    function decodeThrottle(raw) {
+      if (!raw || raw === 'N/A') return [];
+      const val = parseInt(raw, 16);
+      if (isNaN(val) || val === 0 || val === 1) return [];
+      return THROTTLE_REASONS.filter(([mask]) => val & mask).map(([, name]) => name);
+    }
+
+    function bar(pct, cls) {
+      return `<div class="hv-gauge-bar gpu-health-bar"><div class="hv-gauge-fill ${cls}" style="width:${pct}%"></div></div>`;
+    }
+
+    const wrap = document.createElement('div');
+    wrap.className = 'hv-wrap gpu-health-grid';
+
+    wrap.innerHTML = gpus.map(g => {
+      const memPct   = (g.memUsed !== null && g.memTotal) ? Math.min(Math.round(g.memUsed / g.memTotal * 100), 100) : null;
+      const pwrPct   = (g.powerDraw !== null && g.powerLimit) ? Math.min(Math.round(g.powerDraw / g.powerLimit * 100), 100) : null;
+      const memCls   = pctCls(memPct);
+      const pwrCls   = powerCls(g.powerDraw, g.powerLimit);
+      const throttled = decodeThrottle(g.throttleRaw);
+      const eccBad   = g.eccUncorrected !== null && g.eccUncorrected > 0;
+      const eccWarn  = !eccBad && g.eccCorrected !== null && g.eccCorrected > 0;
+
+      return `
+        <div class="gpu-health-card">
+          <div class="gpu-health-hdr">
+            <span class="gpu-proc-idx">GPU ${h(g.index)}</span>
+            <span class="gpu-health-name">${h(g.name)}</span>
+          </div>
+
+          <div class="gpu-health-row">
+            <div class="gpu-health-cell">
+              <span class="gpu-health-lbl">GPU temp</span>
+              <span class="gpu-health-val ${tempCls(g.tempGpu)}">${g.tempGpu !== null ? g.tempGpu + '°C' : '—'}</span>
+            </div>
+            <div class="gpu-health-cell">
+              <span class="gpu-health-lbl">Mem temp</span>
+              <span class="gpu-health-val ${tempCls(g.tempMem)}">${g.tempMem !== null ? g.tempMem + '°C' : '—'}</span>
+            </div>
+            <div class="gpu-health-cell">
+              <span class="gpu-health-lbl">GPU util</span>
+              <span class="gpu-health-val ${pctCls(g.utilGpu)}">${g.utilGpu !== null ? g.utilGpu + '%' : '—'}</span>
+            </div>
+            <div class="gpu-health-cell">
+              <span class="gpu-health-lbl">Mem util</span>
+              <span class="gpu-health-val ${pctCls(g.utilMem)}">${g.utilMem !== null ? g.utilMem + '%' : '—'}</span>
+            </div>
+          </div>
+
+          <div class="gpu-health-metric">
+            <div class="gpu-health-metric-hdr">
+              <span class="gpu-health-lbl">Memory</span>
+              <span class="gpu-health-val ${memCls}">${memPct !== null ? memPct + '%' : '—'}</span>
+            </div>
+            ${memPct !== null ? bar(memPct, memCls) : ''}
+            <div class="gpu-health-sub">${g.memUsed !== null ? Math.round(g.memUsed) + ' MiB used' : ''} ${g.memTotal ? '· ' + Math.round(g.memTotal) + ' MiB total' : ''}</div>
+          </div>
+
+          <div class="gpu-health-metric">
+            <div class="gpu-health-metric-hdr">
+              <span class="gpu-health-lbl">Power</span>
+              <span class="gpu-health-val ${pwrCls}">${g.powerDraw !== null ? g.powerDraw.toFixed(1) + ' W' : '—'}${g.powerLimit ? ' / ' + g.powerLimit.toFixed(0) + ' W' : ''}</span>
+            </div>
+            ${pwrPct !== null ? bar(pwrPct, pwrCls) : ''}
+          </div>
+
+          <div class="gpu-health-ecc ${eccBad ? 'gpu-health-ecc-bad' : eccWarn ? 'gpu-health-ecc-warn' : 'gpu-health-ecc-ok'}">
+            <span class="gpu-health-lbl">ECC errors</span>
+            <span class="gpu-health-ecc-vals">
+              <span title="Corrected (volatile)">${g.eccCorrected ?? '—'} corrected</span>
+              <span class="${eccBad ? 'hv-crit' : ''}" title="Uncorrected (volatile)">${g.eccUncorrected ?? '—'} uncorrected</span>
+            </span>
+          </div>
+
+          ${throttled.length ? `
+          <div class="gpu-health-throttle">
+            <span class="gpu-health-lbl gpu-health-throttle-lbl">Clock throttled</span>
+            <div class="gpu-health-throttle-tags">${throttled.map(r => `<span class="gpu-health-throttle-tag">${h(r)}</span>`).join('')}</div>
+          </div>` : ''}
+        </div>`;
+    }).join('');
+
+    container.innerHTML = '';
+    container.className = '';
+    container.appendChild(wrap);
+  }
+
+  /* ══════════════════════════════════════════════════════════════════════
+   * GPU processes — nvidia-smi pmon or --query-compute-apps
+   * ══════════════════════════════════════════════════════════════════════ */
+  function renderGpuProcessesView(raw, container) {
+    const lines = raw.split('\n').map(l => l.trim()).filter(l => l);
+    if (!lines.length) { container.textContent = raw; return; }
+
+    const wrap = document.createElement('div');
+    wrap.className = 'hv-wrap';
+
+    // pmon format: header lines start with '#'
+    if (lines[0].startsWith('# gpu')) {
+      const dataLines = lines.filter(l => !l.startsWith('#'));
+      const active = dataLines.filter(l => {
+        const parts = l.split(/\s+/);
+        return parts[1] && parts[1] !== '-';
+      });
+
+      if (!active.length) {
+        const idleHtml = dataLines.map(l => {
+          const parts = l.split(/\s+/);
+          return `<div class="gpu-proc-idle-row">
+            <span class="gpu-proc-idx">GPU ${h(parts[0] || '?')}</span>
+            <span class="gpu-proc-idle-lbl">No active processes</span>
+          </div>`;
+        }).join('');
+        wrap.innerHTML = `<div class="gpu-proc-idle">${idleHtml}</div>`;
+      } else {
+        function metricCell(v) {
+          const n = parseFloat(v);
+          const cls = (!isNaN(n) && n > 0)
+            ? (n >= 80 ? 'hv-crit' : n >= 40 ? 'hv-warn' : 'gpu-proc-active') : '';
+          return `<td class="${cls}">${h(v === '-' ? '—' : v + '%')}</td>`;
+        }
+        const tableRows = active.map(l => {
+          const [gpu, pid, type, sm, mem, enc, dec, , , ...cmdParts] = l.split(/\s+/);
+          const cmd = cmdParts.join(' ') || '—';
+          return `<tr>
+            <td><span class="gpu-proc-idx">GPU ${h(gpu)}</span></td>
+            <td class="gpu-proc-pid">${h(pid)}</td>
+            <td><span class="gpu-proc-type gpu-proc-type-${h((type || '').toLowerCase())}">${h(type || '—')}</span></td>
+            ${metricCell(sm)} ${metricCell(mem)} ${metricCell(enc)} ${metricCell(dec)}
+            <td class="gpu-proc-cmd">${h(cmd)}</td>
+          </tr>`;
+        }).join('');
+        wrap.innerHTML = `
+          <div class="hv-top-table-wrap">
+            <table class="hv-top-table">
+              <thead><tr>
+                <th>GPU</th><th>PID</th><th>Type</th>
+                <th>SM %</th><th>Mem %</th><th>Enc %</th><th>Dec %</th>
+                <th>Process</th>
+              </tr></thead>
+              <tbody>${tableRows}</tbody>
+            </table>
+          </div>`;
+      }
+
+    } else {
+      // --query-compute-apps CSV: pid, used_gpu_memory, name
+      const rows = lines
+        .map(l => { const p = l.split(',').map(s => s.trim()); return { pid: p[0], mem: p[1], name: p[2] }; })
+        .filter(r => r.pid && r.pid !== '-');
+
+      if (!rows.length) {
+        wrap.innerHTML = '<div class="gpu-proc-idle"><div class="gpu-proc-idle-row"><span class="gpu-proc-idle-lbl">No GPU compute processes running.</span></div></div>';
+      } else {
+        const tableRows = rows.map(r => `<tr>
+          <td class="gpu-proc-pid">${h(r.pid)}</td>
+          <td class="gpu-proc-mem">${h(r.mem)}</td>
+          <td class="gpu-proc-cmd">${h(r.name)}</td>
+        </tr>`).join('');
+        wrap.innerHTML = `
+          <div class="hv-top-table-wrap">
+            <table class="hv-top-table">
+              <thead><tr><th>PID</th><th>GPU Memory</th><th>Process</th></tr></thead>
+              <tbody>${tableRows}</tbody>
+            </table>
+          </div>`;
+      }
+    }
+
+    container.innerHTML = '';
+    container.className = '';
+    container.appendChild(wrap);
+  }
+
   /* ── Exports ─────────────────────────────────────────────────────────── */
   window.renderMemInfoView     = renderMemInfoView;
   window.renderMemPressureView = renderMemPressureView;
@@ -458,5 +867,8 @@
   window.renderKubeletLogsView = renderKubeletLogsView;
   window.renderDiskView        = renderDiskView;
   window.renderCpuView         = renderCpuView;
+  window.renderGpuInfoView         = renderGpuInfoView;
+  window.renderGpuHealthView       = renderGpuHealthView;
+  window.renderGpuProcessesView    = renderGpuProcessesView;
 
 })();

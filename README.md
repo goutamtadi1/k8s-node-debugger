@@ -22,6 +22,14 @@ node bin/k8s-node-debugger.js <node-name>
 
 ![Node Health view](https://raw.githubusercontent.com/goutamtadi1/k8s-node-debugger/main/docs/screenshot-health.png)
 
+### GPU Health — temperature, power, utilization, memory, ECC errors, clock throttle
+
+![GPU Health view](https://raw.githubusercontent.com/goutamtadi1/k8s-node-debugger/main/docs/screenshot-gpu-health.png)
+
+### GPU Status — driver version, CUDA, per-GPU metrics, processes
+
+![GPU Status view](https://raw.githubusercontent.com/goutamtadi1/k8s-node-debugger/main/docs/screenshot-gpu-status.png)
+
 ## Install
 
 ```bash
