@@ -229,6 +229,7 @@ const PROBES = [
     commands: [
       'nvidia-smi',
       'nsenter --mount=/proc/1/ns/mnt -- nvidia-smi 2>/dev/null',
+      'echo "nvidia-smi not available — no GPU detected on this node."',
     ],
   },
   {
@@ -238,16 +239,21 @@ const PROBES = [
     desc: 'Processes currently consuming GPU memory.',
     commands: [
       'nvidia-smi --query-compute-apps=pid,used_gpu_memory,name --format=csv,noheader 2>/dev/null | sort -t, -k2 -rn | head -30',
+      'nsenter --mount=/proc/1/ns/mnt -- nvidia-smi --query-compute-apps=pid,used_gpu_memory,name --format=csv,noheader | sort -t, -k2 -rn | head -30',
       'nvidia-smi pmon -s u -c 1 2>/dev/null',
+      'nsenter --mount=/proc/1/ns/mnt -- nvidia-smi pmon -s u -c 1',
+      'echo "nvidia-smi not available — no GPU detected on this node."',
     ],
   },
   {
-    id: 'gpu-dcgm',
-    label: 'DCGM health',
+    id: 'gpu-health',
+    label: 'GPU health',
     group: 'GPU',
-    desc: 'DCGM (Data Center GPU Manager) health check. Requires dcgmi to be installed.',
+    desc: 'Per-GPU temperature, power, utilization, memory, ECC errors, and clock throttle reasons.',
     commands: [
-      'dcgmi health -g 0 -j 2>/dev/null || dcgmi health -g 0 2>/dev/null || echo "dcgmi not available — DCGM is not installed on this node."',
+      'nvidia-smi --query-gpu=index,name,temperature.gpu,temperature.memory,power.draw,power.limit,utilization.gpu,utilization.memory,memory.used,memory.free,memory.total,ecc.errors.corrected.volatile.total,ecc.errors.uncorrected.volatile.total,clocks_throttle_reasons.active --format=csv,noheader 2>/dev/null',
+      'nsenter --mount=/proc/1/ns/mnt -- nvidia-smi --query-gpu=index,name,temperature.gpu,temperature.memory,power.draw,power.limit,utilization.gpu,utilization.memory,memory.used,memory.free,memory.total,ecc.errors.corrected.volatile.total,ecc.errors.uncorrected.volatile.total,clocks_throttle_reasons.active --format=csv,noheader',
+      'echo "nvidia-smi not available — no GPU detected on this node."',
     ],
   },
 ];
