@@ -248,8 +248,8 @@ const PROBES = [
     group: 'Storage',
     desc: 'Ranked list of containers by disk usage. Maps containerd snapshot sizes to pod names via overlay mounts and crictl.',
     commands: [
-      "echo '=SNAPS='; nsenter -t 1 -m -- du -d 1 /var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots 2>/dev/null | sort -rn | head -40; echo '=MOUNTS='; nsenter -t 1 -m -- mount 2>/dev/null | grep snapshots; echo '=CRICTL='; nsenter -t 1 -m -u -i -n -p -- crictl ps -a 2>/dev/null",
-      "echo '=SNAPS='; du -d 1 /var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots 2>/dev/null | sort -rn | head -40; echo '=MOUNTS='; mount 2>/dev/null | grep snapshots; echo '=CRICTL='; crictl ps -a 2>/dev/null",
+      "echo '=SNAPS='; nsenter -t 1 -m -- du -d 1 /var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots 2>/dev/null | sort -rn; echo '=WRITABLE='; ls -d /var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/*/work 2>/dev/null | sed 's|.*/snapshots/||;s|/work||'; echo '=MOUNTS='; nsenter -t 1 -m -- mount 2>/dev/null | grep snapshots; echo '=CRICTL='; nsenter -t 1 -m -u -i -n -p -- crictl ps -a 2>/dev/null",
+      "echo '=SNAPS='; du -d 1 /var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots 2>/dev/null | sort -rn; echo '=WRITABLE='; ls -d /var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/*/work 2>/dev/null | sed 's|.*/snapshots/||;s|/work||'; echo '=MOUNTS='; mount 2>/dev/null | grep snapshots; echo '=CRICTL='; crictl ps -a 2>/dev/null",
     ],
   },
 
