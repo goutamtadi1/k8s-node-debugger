@@ -1,6 +1,6 @@
 {
   "name": "@gtadi/k8s-node-debugger",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Spin up a privileged debug pod on a target Kubernetes node and inspect its network stack (iptables, resolv.conf, conntrack, routes, sockets) from a browser UI.",
   "bin": {
     "k8s-node-debugger": "bin/k8s-node-debugger.js"
