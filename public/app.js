@@ -191,6 +191,7 @@ function buildSidebar(probes) {
       'Health':    { panelId: 'health',    label: 'Node Health' },
       'Firewall':  { panelId: 'firewall',  label: 'Firewall' },
       'Conntrack': { panelId: 'conntrack', label: 'Conntrack' },
+      'Storage':   { panelId: 'storage',   label: 'Storage' },
     };
     if (GROUP_PANELS[grp]) {
       const { panelId, label } = GROUP_PANELS[grp];
@@ -250,6 +251,7 @@ function navItem(id, label, type) {
 const HEALTH_ORDER    = ['cpu-stat', 'mem-info', 'disk-usage', 'mem-pressure', 'oom-kills', 'kubelet-logs'];
 const FIREWALL_ORDER  = ['iptables', 'iptables-nat', 'nftables', 'ipvs'];
 const CONNTRACK_ORDER = ['conntrack', 'conntrack-stats', 'conntrack-count'];
+const STORAGE_ORDER   = ['storage-partitions', 'storage-du-tree', 'storage-containers'];
 
 // Probes that get a rich custom renderer instead of a plain <pre>.
 const FANCY_PROBES = new Set([
@@ -257,6 +259,7 @@ const FANCY_PROBES = new Set([
   'conntrack', 'conntrack-stats', 'conntrack-count',
   'mem-info', 'mem-pressure', 'oom-kills', 'kubelet-logs', 'disk-usage', 'cpu-stat',
   'gpu-info', 'gpu-health', 'gpu-processes',
+  'storage-partitions', 'storage-du-tree', 'storage-containers',
 ]);
 
 function buildProbePanel(probe) {
@@ -384,11 +387,14 @@ function tryFancyRender(id, output, container) {
     'mem-pressure':    () => renderMemPressureView(output, container),
     'oom-kills':       () => renderOomKillsView(output, container),
     'kubelet-logs':    () => renderKubeletLogsView(output, container),
-    'disk-usage':      () => renderDiskView(output, container),
-    'cpu-stat':        () => renderCpuView(output, container),
-    'gpu-info':        () => renderGpuInfoView(output, container),
-    'gpu-health':      () => renderGpuHealthView(output, container),
-    'gpu-processes':   () => renderGpuProcessesView(output, container),
+    'disk-usage':           () => renderDiskView(output, container),
+    'cpu-stat':             () => renderCpuView(output, container),
+    'gpu-info':             () => renderGpuInfoView(output, container),
+    'gpu-health':           () => renderGpuHealthView(output, container),
+    'gpu-processes':        () => renderGpuProcessesView(output, container),
+    'storage-partitions':   () => renderStoragePartitionsView(output, container),
+    'storage-du-tree':      () => renderStorageDuTreeView(output, container),
+    'storage-containers':   () => renderStorageContainersView(output, container),
   };
   if (!renderers[id]) return false;
   try { renderers[id](); return true; } catch (e) { console.error('[fancy render]', id, e); return false; }
@@ -522,10 +528,11 @@ async function init() {
   session = await api('/api/session');
   const nodes = await api('/api/nodes');
 
-  const GROUP_IDS = new Set(['Health', 'Firewall', 'Conntrack']);
+  const GROUP_IDS = new Set(['Health', 'Firewall', 'Conntrack', 'Storage']);
   const healthProbes    = session.probes.filter(p => p.group === 'Health');
   const firewallProbes  = session.probes.filter(p => p.group === 'Firewall');
   const conntrackProbes = session.probes.filter(p => p.group === 'Conntrack');
+  const storageProbes   = session.probes.filter(p => p.group === 'Storage');
   const otherProbes     = session.probes.filter(p => !GROUP_IDS.has(p.group));
 
   buildSidebar(session.probes);
@@ -533,6 +540,7 @@ async function init() {
   buildGroupPanel('health',    'Node Health', healthProbes,    HEALTH_ORDER);
   buildGroupPanel('firewall',  'Firewall',    firewallProbes,  FIREWALL_ORDER);
   buildGroupPanel('conntrack', 'Conntrack',   conntrackProbes, CONNTRACK_ORDER);
+  buildGroupPanel('storage',   'Storage',     storageProbes,   STORAGE_ORDER);
 
   renderOverview(nodes);
   showPanel('overview');
