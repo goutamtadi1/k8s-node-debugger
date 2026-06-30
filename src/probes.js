@@ -220,6 +220,39 @@ const PROBES = [
     ],
   },
 
+  // ── Storage ─────────────────────────────────────────────────────────
+  {
+    id: 'storage-partitions',
+    label: 'Partitions',
+    group: 'Storage',
+    desc: 'Real physical host partitions (tmpfs, devtmpfs, shm, overlay filtered out). Identifies the true data-hosting disk.',
+    commands: [
+      "nsenter -t 1 -m -- df -hT 2>/dev/null | grep -vE '^tmpfs|^devtmpfs|^overlay|^shm'",
+      "df -hT | grep -vE '^tmpfs|^devtmpfs|^overlay|^shm'",
+    ],
+  },
+  {
+    id: 'storage-du-tree',
+    label: 'Folder drill-down',
+    group: 'Storage',
+    desc: 'Layered du drill-down — stateful partition → /var → /var/lib → containerd — to pinpoint space consumers at each level.',
+    commands: [
+      "echo '=stateful='; nsenter -t 1 -m -- du -h -d 1 /mnt/stateful_partition 2>/dev/null | sort -h -r; echo '=var='; nsenter -t 1 -m -- du -h -d 1 /mnt/stateful_partition/var 2>/dev/null | sort -h -r; echo '=varlib='; nsenter -t 1 -m -- du -h -d 1 /mnt/stateful_partition/var/lib 2>/dev/null | sort -h -r; echo '=containerd='; nsenter -t 1 -m -- du -h -d 1 /mnt/stateful_partition/var/lib/containerd 2>/dev/null | sort -h -r",
+      "echo '=stateful='; du -h -d 1 /mnt/stateful_partition 2>/dev/null | sort -h -r; echo '=var='; du -h -d 1 /mnt/stateful_partition/var 2>/dev/null | sort -h -r; echo '=varlib='; du -h -d 1 /mnt/stateful_partition/var/lib 2>/dev/null | sort -h -r; echo '=containerd='; du -h -d 1 /mnt/stateful_partition/var/lib/containerd 2>/dev/null | sort -h -r",
+      "echo '=varlib='; du -h -d 1 /var/lib 2>/dev/null | sort -h -r; echo '=containerd='; du -h -d 1 /var/lib/containerd 2>/dev/null | sort -h -r",
+    ],
+  },
+  {
+    id: 'storage-containers',
+    label: 'Top containers',
+    group: 'Storage',
+    desc: 'Ranked list of containers by disk usage. Maps containerd snapshot sizes to pod names via overlay mounts and crictl.',
+    commands: [
+      "echo '=SNAPS='; nsenter -t 1 -m -- du -d 1 /var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots 2>/dev/null | sort -rn | head -40; echo '=MOUNTS='; nsenter -t 1 -m -- mount 2>/dev/null | grep snapshots; echo '=CRICTL='; nsenter -t 1 -m -u -i -n -p -- crictl ps -a 2>/dev/null",
+      "echo '=SNAPS='; du -d 1 /var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots 2>/dev/null | sort -rn | head -40; echo '=MOUNTS='; mount 2>/dev/null | grep snapshots; echo '=CRICTL='; crictl ps -a 2>/dev/null",
+    ],
+  },
+
   // ── GPU ─────────────────────────────────────────────────────────────
   {
     id: 'gpu-info',

@@ -860,6 +860,261 @@
     container.appendChild(wrap);
   }
 
+  /* ══════════════════════════════════════════════════════════════════════
+   * Storage — Partition overview (filtered df -hT)
+   * ══════════════════════════════════════════════════════════════════════ */
+  function renderStoragePartitionsView(raw, container) {
+    const lines = raw.split('\n').filter(l => l.trim());
+    if (lines.length < 2) { container.textContent = raw; return; }
+
+    const rows = [];
+    for (const line of lines.slice(1)) {
+      const parts = line.trim().split(/\s+/);
+      if (parts.length < 7) continue;
+      const [fs, type, size, used, avail, usePct, ...rest] = parts;
+      const mount = rest.join(' ');
+      const p = parseInt(usePct);
+      rows.push({ fs, type, size, used, avail, pct: isNaN(p) ? 0 : p, mount });
+    }
+
+    if (!rows.length) { container.textContent = raw; return; }
+
+    const wrap = document.createElement('div');
+    wrap.className = 'hv-wrap';
+
+    const rowsHtml = rows.map(r => {
+      const cls = colorCls(r.pct);
+      return `
+        <div class="hv-disk-row">
+          <div class="hv-disk-header">
+            <span class="hv-disk-mount">${h(r.mount)}</span>
+            <span class="hv-disk-fs">${h(r.fs)} <span style="opacity:0.5;font-size:11px">${h(r.type)}</span></span>
+            <div class="hv-disk-sizes">
+              <span class="hv-disk-pct ${cls}">${r.pct}%</span>
+              <span class="hv-disk-nums">${h(r.used)} used · ${h(r.avail)} free · ${h(r.size)} total</span>
+            </div>
+          </div>
+          <div class="hv-disk-bar"><div class="hv-disk-fill ${cls}" style="width:${r.pct}%"></div></div>
+        </div>`;
+    }).join('');
+
+    wrap.innerHTML = `<div class="hv-disk-list">${rowsHtml}</div>`;
+    container.innerHTML = '';
+    container.className = '';
+    container.appendChild(wrap);
+  }
+
+  /* ══════════════════════════════════════════════════════════════════════
+   * Storage — du tree drill-down
+   * ══════════════════════════════════════════════════════════════════════ */
+  function renderStorageDuTreeView(raw, container) {
+    const SECTION_LABELS = {
+      stateful:  '/mnt/stateful_partition',
+      var:       '/var',
+      varlib:    '/var/lib',
+      containerd: '/var/lib/containerd',
+    };
+
+    const sections = {};
+    let cur = null;
+    for (const line of raw.split('\n')) {
+      const sec = line.match(/^=(stateful|var|varlib|containerd)=$/);
+      if (sec) { cur = sec[1]; sections[cur] = []; continue; }
+      if (cur && line.trim()) sections[cur].push(line.trim());
+    }
+
+    function parseHumanSize(s) {
+      const m = (s || '').trim().match(/^([0-9.]+)\s*([KMGTP]?)/i);
+      if (!m) return 0;
+      const n = parseFloat(m[1]);
+      const mul = { '': 1, K: 1024, M: 1024 ** 2, G: 1024 ** 3, T: 1024 ** 4 }[m[2].toUpperCase()] || 1;
+      return n * mul;
+    }
+
+    const wrap = document.createElement('div');
+    wrap.className = 'hv-wrap';
+
+    const order = ['stateful', 'var', 'varlib', 'containerd'];
+    const sectionsHtml = order.filter(k => sections[k]?.length).map(key => {
+      const entries = sections[key]
+        .map(line => { const [size, ...pathParts] = line.split(/\t/); return { size: size.trim(), path: pathParts.join('\t').trim() }; })
+        .filter(e => e.size && e.path);
+
+      if (!entries.length) return '';
+
+      const maxBytes = Math.max(...entries.map(e => parseHumanSize(e.size)), 1);
+
+      const rowsHtml = entries.slice(0, 20).map(e => {
+        const bytes = parseHumanSize(e.size);
+        const pct = Math.min(Math.round(bytes / maxBytes * 100), 100);
+        const cls = pct >= 80 ? 'hv-crit' : pct >= 50 ? 'hv-warn' : 'hv-ok';
+        const name = e.path.replace(/^.*\//, '') || e.path;
+        return `
+          <div class="st-du-row">
+            <div class="st-du-header">
+              <span class="st-du-name" title="${h(e.path)}">${h(name)}</span>
+              <span class="st-du-size ${pct >= 60 ? cls : ''}">${h(e.size)}</span>
+            </div>
+            <div class="hv-gauge-bar"><div class="hv-gauge-fill ${cls}" style="width:${pct}%"></div></div>
+          </div>`;
+      }).join('');
+
+      return `
+        <div class="st-du-section">
+          <div class="st-du-section-title">${h(SECTION_LABELS[key] || key)}</div>
+          <div class="st-du-rows">${rowsHtml}</div>
+        </div>`;
+    }).join('');
+
+    wrap.innerHTML = sectionsHtml || '<div class="hv-info-note">No du data available — path may not exist on this node.</div>';
+    container.innerHTML = '';
+    container.className = '';
+    container.appendChild(wrap);
+  }
+
+  /* ══════════════════════════════════════════════════════════════════════
+   * Storage — Top containers by snapshot disk usage
+   * Parses three sections from the compound command:
+   *   =SNAPS=  du -d 1 …/snapshots  (bytes\tpath)
+   *   =MOUNTS= mount | grep snapshots
+   *   =CRICTL= crictl ps -a
+   * ══════════════════════════════════════════════════════════════════════ */
+  function renderStorageContainersView(raw, container) {
+    const sections = {};
+    let cur = null;
+    for (const line of raw.split('\n')) {
+      const sec = line.match(/^=(SNAPS|MOUNTS|CRICTL)=$/);
+      if (sec) { cur = sec[1]; sections[cur] = []; continue; }
+      if (cur && line.trim()) sections[cur].push(line);
+    }
+
+    // 1. Parse snapshot sizes: "1234567\t/path/snapshots/932" → snapId → KB
+    const snapKb = new Map();
+    for (const line of (sections.SNAPS || [])) {
+      const m = line.match(/^(\d+)\s+.*\/(\d+)\s*$/);
+      if (m) snapKb.set(m[2], parseInt(m[1]));
+    }
+
+    // 2. Build snapId → containerHash from overlay mount lines.
+    //    Mount target contains: /k8s.io/{64-char-hash}/rootfs
+    //    Mount options contain: snapshots/NNN/ references
+    const snapToHash = new Map();
+    for (const line of (sections.MOUNTS || [])) {
+      const hashM = line.match(/\/k8s\.io\/([a-f0-9]{64})\//);
+      if (!hashM) continue;
+      const hash = hashM[1];
+      for (const m of line.matchAll(/snapshots\/(\d+)\//g)) {
+        if (!snapToHash.has(m[1])) snapToHash.set(m[1], hash);
+      }
+    }
+
+    // 3. Parse crictl ps -a using header positions for fixed-width columns.
+    const hashToInfo = new Map();
+    const crictlLines = (sections.CRICTL || []).filter(l => l.trim());
+    if (crictlLines.length > 1) {
+      const header = crictlLines[0];
+      const colStarts = {
+        CONTAINER: header.indexOf('CONTAINER'),
+        IMAGE:     header.indexOf('IMAGE'),
+        STATE:     header.indexOf('STATE'),
+        NAME:      header.indexOf('NAME'),
+        POD:       header.lastIndexOf('POD'),
+      };
+      for (const line of crictlLines.slice(1)) {
+        if (line.startsWith('CONTAINER')) continue;
+        function col(start, end) {
+          return end > start ? line.substring(start, end).trim() : line.substring(start).trim();
+        }
+        const id    = col(colStarts.CONTAINER, colStarts.IMAGE);
+        const state = col(colStarts.STATE, colStarts.NAME);
+        const name  = col(colStarts.NAME, colStarts.POD);
+        const pod   = line.substring(colStarts.POD).trim();
+        if (!id) continue;
+        const info = { state, name, pod: pod || name };
+        hashToInfo.set(id, info);
+        if (id.length > 12) hashToInfo.set(id.substring(0, 12), info);
+      }
+    }
+
+    // 4. Build ranked rows: snapId sorted by KB desc → join hash → join container info
+    const rows = [...snapKb.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 25)
+      .map(([snapId, kb]) => {
+        const hash = snapToHash.get(snapId);
+        const info = hash
+          ? (hashToInfo.get(hash) || hashToInfo.get(hash.substring(0, 12)))
+          : null;
+        return { snapId, kb, hash, info };
+      });
+
+    const wrap = document.createElement('div');
+    wrap.className = 'hv-wrap';
+
+    if (!rows.length) {
+      wrap.innerHTML = '<div class="hv-info-note">No containerd overlayfs snapshot data found. The snapshotter path may differ on this node.</div>';
+      container.innerHTML = '';
+      container.appendChild(wrap);
+      return;
+    }
+
+    const totalKb = [...snapKb.values()].reduce((a, b) => a + b, 0);
+    const mappedCount = rows.filter(r => r.info).length;
+    const maxKb = rows[0].kb || 1;
+
+    const listHtml = rows.map((r, i) => {
+      const pct = Math.min(Math.round(r.kb / maxKb * 100), 100);
+      const cls  = r.kb >= maxKb * 0.5 ? 'hv-crit' : r.kb >= maxKb * 0.2 ? 'hv-warn' : 'hv-ok';
+      const stateCls = r.info?.state === 'Running' ? 'hv-ok' : r.info?.state ? 'hv-warn' : '';
+      const podLabel  = r.info?.pod  || (r.hash ? r.hash.substring(0, 16) + '…' : '—');
+      const nameLabel = r.info?.name || '';
+      return `
+        <div class="st-cont-row">
+          <div class="st-cont-header">
+            <span class="st-cont-rank">#${i + 1}</span>
+            <div class="st-cont-names">
+              <span class="st-cont-pod">${h(podLabel)}</span>
+              ${nameLabel ? `<span class="st-cont-name">${h(nameLabel)}</span>` : ''}
+            </div>
+            ${r.info?.state ? `<span class="st-cont-state ${stateCls}">${h(r.info.state)}</span>` : ''}
+            <span class="st-cont-size ${cls}">${hBytes(r.kb)}</span>
+          </div>
+          <div class="hv-gauge-bar st-cont-bar">
+            <div class="hv-gauge-fill ${cls}" style="width:${pct}%"></div>
+          </div>
+          <div class="st-cont-meta">
+            <span class="st-cont-meta-tag">snap #${h(r.snapId)}</span>
+            ${r.hash ? `<span class="st-cont-meta-tag">${h(r.hash.substring(0, 20))}…</span>` : '<span class="st-cont-meta-unmapped">unmapped</span>'}
+          </div>
+        </div>`;
+    }).join('');
+
+    wrap.innerHTML = `
+      <div class="hv-info-note">
+        Containerd overlayfs snapshot layers ranked by disk usage. Active layers are mapped to pods via overlay mounts and crictl.
+        Prune dangling images with: <code>nsenter -t 1 -m -u -i -n -p -- crictl rmi --prune</code>
+      </div>
+      <div class="st-summary">
+        <div class="hv-grid-item">
+          <div class="hv-grid-label">Snapshots tracked</div>
+          <div class="hv-grid-val">${snapKb.size}</div>
+        </div>
+        <div class="hv-grid-item">
+          <div class="hv-grid-label">Mapped to pods</div>
+          <div class="hv-grid-val">${mappedCount} / ${rows.length}</div>
+        </div>
+        <div class="hv-grid-item">
+          <div class="hv-grid-label">Total snapshot storage</div>
+          <div class="hv-grid-val">${hBytes(totalKb)}</div>
+        </div>
+      </div>
+      <div class="st-cont-list">${listHtml}</div>`;
+
+    container.innerHTML = '';
+    container.className = '';
+    container.appendChild(wrap);
+  }
+
   /* ── Exports ─────────────────────────────────────────────────────────── */
   window.renderMemInfoView     = renderMemInfoView;
   window.renderMemPressureView = renderMemPressureView;
@@ -867,8 +1122,11 @@
   window.renderKubeletLogsView = renderKubeletLogsView;
   window.renderDiskView        = renderDiskView;
   window.renderCpuView         = renderCpuView;
-  window.renderGpuInfoView         = renderGpuInfoView;
-  window.renderGpuHealthView       = renderGpuHealthView;
-  window.renderGpuProcessesView    = renderGpuProcessesView;
+  window.renderGpuInfoView              = renderGpuInfoView;
+  window.renderGpuHealthView            = renderGpuHealthView;
+  window.renderGpuProcessesView         = renderGpuProcessesView;
+  window.renderStoragePartitionsView    = renderStoragePartitionsView;
+  window.renderStorageDuTreeView        = renderStorageDuTreeView;
+  window.renderStorageContainersView    = renderStorageContainersView;
 
 })();
