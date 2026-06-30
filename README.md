@@ -30,6 +30,12 @@ node bin/k8s-node-debugger.js <node-name>
 
 ![GPU Status view](https://raw.githubusercontent.com/goutamtadi1/k8s-node-debugger/main/docs/screenshot-gpu-status.png)
 
+### Storage — partitions, folder drill-down, top containers by disk usage
+
+![Storage partitions view](https://raw.githubusercontent.com/goutamtadi1/k8s-node-debugger/main/docs/screenshot-storage-partitions.png)
+
+![Storage top containers view](https://raw.githubusercontent.com/goutamtadi1/k8s-node-debugger/main/docs/screenshot-storage-containers.png)
+
 ## Install
 
 ```bash
@@ -85,8 +91,15 @@ Press **Ctrl-C** to stop the server and delete the debug pod.
 | **Sockets** | listening sockets, all TCP/UDP with process names |
 | **Kernel** | key net.* sysctls |
 | **Health** | CPU & load, memory, disk usage, PSI pressure, OOM kills, kubelet logs — each as a tab |
+| **Storage** | physical partitions, layered du drill-down, top containers ranked by snapshot disk usage |
 | **GPU** | nvidia-smi status, GPU processes, DCGM health check |
 | **Terminal** | streaming terminal — run any command inside the pod (tcpdump, dig, ping, conntrack -E …) |
+
+### Storage view features
+
+- **Partitions** — `df -hT` filtered to real physical disks (tmpfs, devtmpfs, shm, overlay excluded); usage bars per partition
+- **Folder drill-down** — layered `du` bars across four levels: stateful partition → `/var` → `/var/lib` → containerd; each level shows sub-folders ranked by size
+- **Top containers** — containerd overlayfs snapshot directories ranked by disk usage, mapped to pod names via overlay mounts and `crictl ps -a`; unmapped snapshots classified as **stopped container** (has writable `work/` layer) or **image layer** (read-only, no `work/` dir); summary shows total snapshot storage, running pods, stopped containers, and image cache layer counts
 
 ### Node Health view features
 
