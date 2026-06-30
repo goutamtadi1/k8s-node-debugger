@@ -983,7 +983,7 @@
     const sections = {};
     let cur = null;
     for (const line of raw.split('\n')) {
-      const sec = line.match(/^=(SNAPS|MOUNTS|CRICTL)=$/);
+      const sec = line.match(/^=(SNAPS|WRITABLE|MOUNTS|CRICTL)=$/);
       if (sec) { cur = sec[1]; sections[cur] = []; continue; }
       if (cur && line.trim()) sections[cur].push(line);
     }
@@ -995,7 +995,11 @@
       if (m) snapKb.set(m[2], parseInt(m[1]));
     }
 
-    // 2. Build snapId → containerHash from overlay mount lines.
+    // 2. Writable snapshots (have a work/ dir) = container layers (running or stopped).
+    //    Image cache layers do NOT have work/ dirs. This lets us classify unmapped snaps.
+    const writableSnaps = new Set((sections.WRITABLE || []).map(l => l.trim()).filter(Boolean));
+
+    // 3. Build snapId → containerHash from overlay mount lines.
     //    Mount target contains: /k8s.io/{64-char-hash}/rootfs
     //    Mount options contain: snapshots/NNN/ references
     const snapToHash = new Map();
@@ -1008,7 +1012,7 @@
       }
     }
 
-    // 3. Parse crictl ps -a using header positions for fixed-width columns.
+    // 4. Parse crictl ps -a using header positions for fixed-width columns.
     const hashToInfo = new Map();
     const crictlLines = (sections.CRICTL || []).filter(l => l.trim());
     if (crictlLines.length > 1) {
@@ -1036,7 +1040,7 @@
       }
     }
 
-    // 4. Build ranked rows: snapId sorted by KB desc → join hash → join container info
+    // 5. Build ranked rows: snapId sorted by KB desc → join hash → join container info
     const rows = [...snapKb.entries()]
       .sort((a, b) => b[1] - a[1])
       .slice(0, 25)
@@ -1045,7 +1049,8 @@
         const info = hash
           ? (hashToInfo.get(hash) || hashToInfo.get(hash.substring(0, 12)))
           : null;
-        return { snapId, kb, hash, info };
+        const isWritable = writableSnaps.has(snapId);
+        return { snapId, kb, hash, info, isWritable };
       });
 
     const wrap = document.createElement('div');
@@ -1059,15 +1064,35 @@
     }
 
     const totalKb = [...snapKb.values()].reduce((a, b) => a + b, 0);
-    const mappedCount = rows.filter(r => r.info).length;
+    const mappedCount  = rows.filter(r => r.info).length;
+    const stoppedCount = rows.filter(r => !r.info && r.isWritable).length;
+    const imageCount   = rows.filter(r => !r.info && !r.isWritable).length;
     const maxKb = rows[0].kb || 1;
 
     const listHtml = rows.map((r, i) => {
       const pct = Math.min(Math.round(r.kb / maxKb * 100), 100);
       const cls  = r.kb >= maxKb * 0.5 ? 'hv-crit' : r.kb >= maxKb * 0.2 ? 'hv-warn' : 'hv-ok';
       const stateCls = r.info?.state === 'Running' ? 'hv-ok' : r.info?.state ? 'hv-warn' : '';
-      const podLabel  = r.info?.pod  || (r.hash ? r.hash.substring(0, 16) + '…' : '—');
-      const nameLabel = r.info?.name || '';
+
+      // Determine label for unmapped snapshots using the work/ dir heuristic
+      let podLabel, nameLabel, stateTag, typeTag = '';
+      if (r.info) {
+        podLabel  = r.info.pod || r.info.name;
+        nameLabel = r.info.name !== r.info.pod ? r.info.name : '';
+        stateTag  = r.info.state
+          ? `<span class="st-cont-state ${stateCls}">${h(r.info.state)}</span>` : '';
+      } else if (r.isWritable) {
+        podLabel  = r.hash ? r.hash.substring(0, 20) + '…' : 'unknown container';
+        nameLabel = '';
+        stateTag  = '<span class="st-cont-state hv-warn">Stopped</span>';
+        typeTag   = '<span class="st-cont-type-tag st-tag-stopped">stopped container</span>';
+      } else {
+        podLabel  = 'image cache layer';
+        nameLabel = '';
+        stateTag  = '';
+        typeTag   = '<span class="st-cont-type-tag st-tag-image">image layer</span>';
+      }
+
       return `
         <div class="st-cont-row">
           <div class="st-cont-header">
@@ -1076,7 +1101,8 @@
               <span class="st-cont-pod">${h(podLabel)}</span>
               ${nameLabel ? `<span class="st-cont-name">${h(nameLabel)}</span>` : ''}
             </div>
-            ${r.info?.state ? `<span class="st-cont-state ${stateCls}">${h(r.info.state)}</span>` : ''}
+            ${stateTag}
+            ${typeTag}
             <span class="st-cont-size ${cls}">${hBytes(r.kb)}</span>
           </div>
           <div class="hv-gauge-bar st-cont-bar">
@@ -1084,7 +1110,7 @@
           </div>
           <div class="st-cont-meta">
             <span class="st-cont-meta-tag">snap #${h(r.snapId)}</span>
-            ${r.hash ? `<span class="st-cont-meta-tag">${h(r.hash.substring(0, 20))}…</span>` : '<span class="st-cont-meta-unmapped">unmapped</span>'}
+            ${r.hash ? `<span class="st-cont-meta-tag">${h(r.hash.substring(0, 20))}…</span>` : ''}
           </div>
         </div>`;
     }).join('');
@@ -1096,16 +1122,20 @@
       </div>
       <div class="st-summary">
         <div class="hv-grid-item">
-          <div class="hv-grid-label">Snapshots tracked</div>
-          <div class="hv-grid-val">${snapKb.size}</div>
-        </div>
-        <div class="hv-grid-item">
-          <div class="hv-grid-label">Mapped to pods</div>
-          <div class="hv-grid-val">${mappedCount} / ${rows.length}</div>
-        </div>
-        <div class="hv-grid-item">
           <div class="hv-grid-label">Total snapshot storage</div>
           <div class="hv-grid-val">${hBytes(totalKb)}</div>
+        </div>
+        <div class="hv-grid-item">
+          <div class="hv-grid-label">Running pods (top ${rows.length})</div>
+          <div class="hv-grid-val" style="color:var(--ok)">${mappedCount}</div>
+        </div>
+        <div class="hv-grid-item">
+          <div class="hv-grid-label">Stopped containers</div>
+          <div class="hv-grid-val" style="color:#d29922">${stoppedCount}</div>
+        </div>
+        <div class="hv-grid-item">
+          <div class="hv-grid-label">Image cache layers</div>
+          <div class="hv-grid-val" style="color:var(--fg-dim)">${imageCount}</div>
         </div>
       </div>
       <div class="st-cont-list">${listHtml}</div>`;
